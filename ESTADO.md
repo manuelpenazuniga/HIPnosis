@@ -87,3 +87,12 @@ pipeline.py: integración M3 end-to-end — VERIFICADO: run completo QUEUED->DON
 🎯 HITO M3 (Día 3) CERRADO EN MOCK: verify + certificado end-to-end.
    Un run completo sin intervención → DONE + PASS + certificado. Falta M3-real: hipcc/GPU (M0 humano).
 ====================================================================
+====================================================================
+🎯 INTEGRACIÓN api↔pipeline COMPLETA (backend end-to-end):
+   POST /runs → pipeline en background (thread) → QUEUED..DONE, verify=PASS, certificado.
+   VERIFICADO EN VIVO (uvicorn mock): un POST corre el pipeline entero y el dashboard lo polea.
+   Piezas: oracle/real.py (M0-ready), runner.py (execute_run), main.py (autorun+SqliteRunStore),
+   api.py (POST→background, conexión SQLite por thread). 369 tests.
+====================================================================
+PENDIENTE (menor/no-bloqueante): unificar contrato de ctx entre handlers; M0 humano (real.py con GPU);
+M5 README/video. El backend está funcionalmente completo en mock.
