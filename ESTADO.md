@@ -75,3 +75,4 @@ T14b: VERIFICADO e2e por orquestador: pipeline bsw QUEUED->DONE en mock, 8->2->0
 T15b: EN CURSO | comparador paridad rtol/atol F-09 (deepseek, riesgo ALTO)
 T15a: EN CURSO | manifest loader + hipnosis.yaml schema (m3)
 T16: EN CURSO | report.py + templates certificado F-17 (m3)
+T15a: ESTRUCTURA: OK | manifest loader §7.1, validado contra manifiestos demo softmax/bsw reales | MERGED (16 tests). Deuda menor: coercer 1e-5 string→float.
