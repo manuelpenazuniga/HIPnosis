@@ -71,3 +71,7 @@ T14b: VERIFICADO e2e por orquestador: pipeline bsw QUEUED->DONE en mock, 8->2->0
    Pipeline QUEUED->DONE, errores drenan, fixes deterministas aplican al fuente, counters poblados.
    Falta para M2-real: hipcc en MI300X (M0 humano, guía en docs/M0-smoke-test.md).
 ====================================================================
+=== M3 (verify + certificado) arrancado ===
+T15b: EN CURSO | comparador paridad rtol/atol F-09 (deepseek, riesgo ALTO)
+T15a: EN CURSO | manifest loader + hipnosis.yaml schema (m3)
+T16: EN CURSO | report.py + templates certificado F-17 (m3)
