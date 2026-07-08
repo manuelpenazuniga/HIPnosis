@@ -1,15 +1,13 @@
 """tests/test_patcher.py -- L2 tests for ``core.patcher``.
 
-Tests cover the full contract: APPLIED, NOT_FOUND, AMBIGUOUS, INVALID edge cases,
-all-or-nothing atomicity, multi-file patches, and trace emission (INV-4).
-
-Every test creates a real git repo in ``tmp_path`` and uses ``core.gitrepo.GitRepo``.
-No file touches disk without going through ``apply_patch``.
+Tests cover: APPLIED, NOT_FOUND, AMBIGUOUS, INVALID edge cases,
+all-or-nothing atomicity, multi-file, trace emission, and 6 auditor-regression cases.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -46,7 +44,7 @@ def _read(path: Path, fname: str) -> str:
 
 
 def _patch(*blocks) -> str:
-    parts = []
+    parts: list[str] = []
     for b in blocks:
         parts.append(f"FILE: {b.file}")
         parts.append("<<<<<<< SEARCH")
@@ -153,6 +151,26 @@ class TestParseBlocks:
         assert len(blocks) == 1
         assert blocks[0].search == "old"
         assert blocks[0].replace == "new"
+
+    # -- Regression #1: malformed block (truncated marker) rejects entire patch --
+    def test_malformed_block_rejects_entire_patch(self):
+        text = (
+            "FILE: a.cu\n"
+            "<<<<<<< SEARCH\n"
+            "old\n"
+            "=======\n"
+            "new\n"
+            ">>>>>>> REPLACE\n"
+            "\n"
+            "FILE: b.cu\n"
+            "<<<<<<< SEARCH\n"
+            "old\n"
+            "=======\n"
+            "new\n"
+            ">>>>>> REPLACE\n"
+        )
+        blocks = parse_blocks(text)
+        assert blocks == []
 
 
 class TestApplyPatchApplied:
@@ -433,3 +451,151 @@ class TestTrace:
         apply_patch(patch, repo, "fix", trace=trace)
 
         assert not Path(trace_path).exists()
+
+
+# ====== AUDITOR REGRESSION TESTS (6 critical bugs) ======
+
+
+class TestRegression:
+    """Auditor regression: concrete cases for the 6 critical bugs."""
+
+    def test_regression_01_malformed_block_ignored(self, tmp_path: Path):
+        """Critical #1: a block with truncated ``>>>>>> REPLACE`` must
+        reject the entire patch — never silently ignore it and apply the
+        remaining blocks."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        repo = _make_repo(repo_dir, {"a.cu": "old\n", "b.cu": "old\n"})
+        sha_before = repo.head_sha()
+
+        patch = (
+            "FILE: a.cu\n"
+            "<<<<<<< SEARCH\n"
+            "old\n"
+            "=======\n"
+            "new\n"
+            ">>>>>>> REPLACE\n"
+            "\n"
+            "FILE: b.cu\n"
+            "<<<<<<< SEARCH\n"
+            "old\n"
+            "=======\n"
+            "new\n"
+            ">>>>>> REPLACE\n"
+        )
+        result = apply_patch(patch, repo, "fix")
+        assert result.status == PatchStatus.INVALID
+        assert "sin bloques" in result.detail
+        assert _read(repo_dir, "a.cu") == "old\n"
+        assert _read(repo_dir, "b.cu") == "old\n"
+        assert repo.head_sha() == sha_before
+
+    def test_regression_02_path_alias_same_file(self, tmp_path: Path):
+        """Critical #2: ``f.cu`` and ``./f.cu`` must canonicalise to
+        the same file. Both blocks apply and the file is patched once."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        repo = _make_repo(repo_dir, {"f.cu": "old1\nold2\n"})
+        sha_before = repo.head_sha()
+
+        patch = _patch(
+            Block("f.cu", "old1", "NEW1"),
+            Block("./f.cu", "old2", "NEW2"),
+        )
+        result = apply_patch(patch, repo, "alias fix")
+        assert result.status == PatchStatus.APPLIED
+        assert _read(repo_dir, "f.cu") == "NEW1\nNEW2\n"
+        assert result.commit_sha != sha_before
+
+    def test_regression_03_symlink_escapes_workspace(self, tmp_path: Path):
+        """Critical #3: a symlink pointing outside the workspace must be
+        rejected — never follow it and write outside."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        outside = tmp_path / "outside.cu"
+        outside.write_text("secret\n", encoding="utf-8")
+        link = repo_dir / "link.cu"
+        os.symlink(str(outside), str(link))
+
+        repo = _make_repo(repo_dir, {"main.cu": "hello\n"})
+        sha_before = repo.head_sha()
+
+        patch = _patch(Block("link.cu", "secret", "leaked"))
+        result = apply_patch(patch, repo, "fix")
+        assert result.status == PatchStatus.INVALID
+        assert "inseguro" in result.detail or "symlink" in result.detail
+        assert outside.read_text(encoding="utf-8") == "secret\n"
+        assert repo.head_sha() == sha_before
+
+    def test_regression_04_non_lf_line_endings(self, tmp_path: Path):
+        """Critical #4: a file with ``\\r`` endings must be rejected
+        before writing, preserving all bytes outside the replacement span."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "f.cu").write_bytes(b"a\r\nb\nc\rd\nint x = 0;\n")
+
+        repo = Repo.init(repo_dir)
+        cfg = repo.config_writer()
+        try:
+            cfg.set_value("user", "name", "Test")
+            cfg.set_value("user", "email", "test@example.com")
+        finally:
+            cfg.release()
+        repo.index.add(["f.cu"])
+        repo.index.commit("init")
+        gr = GitRepo(str(repo_dir))
+        sha_before = gr.head_sha()
+
+        patch = _patch(Block("f.cu", "int x = 0;", "int x = 1;"))
+        result = apply_patch(patch, gr, "fix")
+        assert result.status == PatchStatus.INVALID
+        assert "no-LF" in result.detail
+        assert (repo_dir / "f.cu").read_bytes() == b"a\r\nb\nc\rd\nint x = 0;\n"
+        assert gr.head_sha() == sha_before
+
+    def test_regression_05_precomputed_spans_no_research(self, tmp_path: Path):
+        """Critical #5: when REPLACE of Block 2 introduces SEARCH of Block 1,
+        precomputed spans prevent ambiguous re-search on mutated content."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        repo = _make_repo(repo_dir, {"f.cu": "A\nB\n"})
+        sha_before = repo.head_sha()
+
+        patch = _patch(
+            Block("f.cu", "A", "X"),
+            Block("f.cu", "B", "B\nA"),
+        )
+        result = apply_patch(patch, repo, "tricky")
+        assert result.status == PatchStatus.APPLIED
+        assert _read(repo_dir, "f.cu") == "X\nB\nA\n"
+        assert result.commit_sha != sha_before
+
+    def test_regression_06_exception_restore_no_commit(self, tmp_path: Path):
+        """Critical #6: an exception during commit (corrupted .git) restores
+        modified files from in-memory snapshots — the repo is never left
+        written without a commit or revert."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        gr = _make_repo(repo_dir, {"a.cu": "alpha\n", "b.cu": "beta\n"})
+        sha_before = gr.head_sha()
+        original_bytes = {
+            "a.cu": (repo_dir / "a.cu").read_bytes(),
+            "b.cu": (repo_dir / "b.cu").read_bytes(),
+        }
+
+        objects_dir = repo_dir / ".git" / "objects"
+        objects_dir.chmod(0o500)
+
+        patch = _patch(
+            Block("a.cu", "alpha", "NEW"),
+            Block("b.cu", "beta", "NEW2"),
+        )
+        result = apply_patch(patch, gr, "fix")
+
+        objects_dir.chmod(0o700)
+
+        assert result.status == PatchStatus.INVALID
+        assert "error interno" in result.detail
+        for fname, orig in original_bytes.items():
+            assert (repo_dir / fname).read_bytes() == orig, f"{fname} not restored"
+        assert gr.head_sha() == sha_before
