@@ -1,0 +1,13 @@
+# Contexto de build mínimo (acelera y evita filtrar basura al image)
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+.venv/
+venv/
+workspaces/
+.git/
+.agents/
+*.env
+!orchestrator/.env.example
+.DS_Store
+docs/

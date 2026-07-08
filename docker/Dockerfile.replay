@@ -1,0 +1,32 @@
+# Dockerfile.replay — imagen SLIM para el perfil `replay` (F-16).
+# El modo replay NO ejecuta el pipeline ni necesita ROCm/GPU (blueprint §9): solo
+# sirve el dashboard + un trace grabado. Por eso usa python:slim (~150MB) en vez de
+# la imagen ROCm (~20GB) del perfil gpu — así los jueces lo corren en cualquier laptop.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Dependencias de RUNTIME del orquestador en modo replay (sin herramientas de build).
+RUN pip install --no-cache-dir \
+    "fastapi>=0.110" \
+    "uvicorn[standard]>=0.29" \
+    "pydantic>=2.6" \
+    "pyyaml>=6.0" \
+    "jinja2>=3.1" \
+    "httpx>=0.27" \
+    "gitpython>=3.1"
+
+# Código + assets. El layout /app/{orchestrator,dashboard,fixtures} coincide con los
+# resolvers de main.py (dashboard) y replay.py (fixtures/demo-run.jsonl).
+COPY orchestrator /app/orchestrator
+COPY dashboard /app/dashboard
+COPY fixtures /app/fixtures
+
+ENV ORACLE_MODE=replay \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app/orchestrator
+EXPOSE 8080
+
+# uvicorn sirve el dashboard estático en / y el API en /runs, /healthz.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
