@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -76,7 +78,7 @@ class VerifyResult(BaseModel):
     exit_code: int
     verdict: str
     parity_details: str
-    timing: dict | None = None
+    timing: dict[str, Any] | None = None
 
 
 class BuildResult(BaseModel):
@@ -90,7 +92,7 @@ class RunResult(BaseModel):
     ran: bool
     exit_code: int
     stdout: str
-    timing: dict | None = None
+    timing: dict[str, Any] | None = None
 
 
 class RunState:
