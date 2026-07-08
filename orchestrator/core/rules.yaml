@@ -1,0 +1,163 @@
+# core/rules.yaml — Taxonomía de errores de porting CUDA→HIP.
+# Blueprint §6.2. Catálogo cerrado (~15 clases) cargado por core.taxonomy.
+#
+# Formato de cada entrada:
+#   id:        E\d\d                       # E01..E13 + E99
+#   name:      snake_case                  # nombre corto (logs/reporte)
+#   match:     { msg_regex: "...", file_regex: "..." }   # al menos una regex
+#              match vacío (catch-all) SOLO permitido en E99 (y debe ser el último).
+#   strategy:  deterministic | llm
+#   tier:      local | remote | local_then_remote   # solo si strategy=llm
+#   fix_template: 's|...|...|'            # sed-like; SOLO deterministic
+#   notes:     "..."                       # inyecto al prompt (blueprint §6.5-B)
+#
+# El ORDEN de las entradas define la prioridad de classify() (blueprint §6.2):
+# la PRIMERA regla cuyo match retorna positivo gana. E99 es siempre la última.
+#
+# Reglas duras (recordatorio, NO relitigar):
+# - Prompts van en prompts.py (no acá). Umbrales en config.py (INV-9).
+# - Esta capa es DETERMINISTA por regex; la clasificación LLM (blueprint §6.5-A)
+#   es OTRA capa que vive en phases/, no en core/.
+
+# ---- E01 — include CUDA colgado -----------------------------------------------
+- id: E01
+  name: leftover_cuda_include
+  match: { msg_regex: "cuda_runtime\\.h|cuda\\.h.*(not found|no such)" }
+  strategy: deterministic
+  fix_template: 's|#include\s*[<"]cuda_runtime\.h[>"]|#include <hip/hip_runtime.h>|'
+
+# ---- E02 — API CUDA sin convertir (identificador no declarado) ----------------
+# Mensaje típico de clang: "use of undeclared identifier 'cudaXxx'".
+# Tabla cuX→hipX embebida en taxonomy.CUDA_TO_HIP (~200 entradas del map de hipify).
+# El fix_template es un PLACEHOLDER sed-like genérico: la sustitución
+# REAL la arma deterministic_fix() a partir del identificador extraído
+# del mensaje (no todas las APIs están en el template).
+- id: E02
+  name: unconverted_api_call
+  match: { msg_regex: "use of undeclared identifier 'cu(da)?[A-Z]" }
+  strategy: deterministic
+  fix_template: 's|cuda([A-Z]\w*)|hip$1|'
+  notes: "Tabla CUDA_TO_HIP embebida (taxonomy.CUDA_TO_HIP). El prefijo cuda→hip cubre la mayoría; enums/constantes también incluidas."
+
+# ---- E03 — tipo/handle CUDA no convertido -------------------------------------
+# cudaError_t / cudaStream_t / cudaEvent_t y otros tipos/typedefs que
+# hipify-perl no convierte porque son identificadores, no llamadas a función.
+# Mensaje típico: "unknown type name 'cudaStream_t'".
+- id: E03
+  name: unconverted_type_or_handle
+  match: { msg_regex: "unknown type name '(cuda[A-Z]\\w*|dim3|cudaStream_t|cudaEvent_t)" }
+  strategy: deterministic
+  fix_template: 's|cuda([A-Z]\w*)|hip$1|'
+  notes: "Tipos/handles CUDA sin convertir (cudaStream_t→hipStream_t, cudaEvent_t→hipEvent_t, dim3→dim3, cudaError_t→hipError_t, etc.). Tabla extendida CUDA_TO_HIP."
+
+# ---- E04 — PTX inline / asm ---------------------------------------------------
+# "error: asm operand type size(4) does not match type size(8)" o
+# "invalid instruction" o cualquier uso de asm() con PTX NVIDIA.
+- id: E04
+  name: inline_ptx
+  match: { msg_regex: "\\basm\\b|invalid instruction|\\bptx\\b|nv_asm" }
+  strategy: llm
+  tier: remote
+  notes: "Reescritura semántica de asm() PTX a intrinsics HIP (__builtin_amdgcn_*) o directivas GCN. SIEMPRE tier remoto: requiere entender la semántica."
+
+# ---- E05 — intrínsecos warp (ballot/shfl/any/all/activemask) ------------------
+# Wavefront AMD = 64 lanes, no 32. __ballot devuelve 64 bits → usar __popcll,
+# warpSize es runtime (NO constante 32).
+- id: E05
+  name: warp_intrinsic_mismatch
+  match: { msg_regex: "__\\s*(ballot|shfl|shfl_xor|shfl_up|shfl_down|any|all|activemask)" }
+  strategy: llm
+  tier: local
+  notes: "AMD wavefront=64 lanes: __ballot devuelve 64 bits (usar __popcll), warpSize es runtime (NO 32), __syncthreads_count/any/all requieren máscara de 64. Plantillas W01-W03 del linter wave64."
+
+# ---- E06 — texturas / superficies CUDA (sin equivalente HIP directo) ----------
+# textura bindless, cudaArray/cudaTextureObject y surface references.
+- id: E06
+  name: texture_or_surface
+  match: { msg_regex: "cudaArray|cudaTexture|cudaSurface|texture<|surface<|tex\\.[0-9]D|surf[0-9]D" }
+  strategy: llm
+  tier: remote
+  notes: "Texturas/superficies no tienen equivalente directo en HIP; reescritura a __ldg / linear memory + SoA. Tier remoto: requiere reescritura semántica."
+
+# ---- E07 — sintaxis de lanzamiento de kernel (<<<...>>>) -----------------------
+# clang no acepta 'kernel<<<grid, block>>>(args)' en .cu pos-hipify si el
+# hipify-perl no tradujo el macro; o se quejará de "expected expression".
+- id: E07
+  name: kernel_launch_syntax
+  match: { msg_regex: "expected expression.*<<|kernel launch|<<<|>>>" }
+  strategy: llm
+  tier: local
+  notes: "Sintaxis <<<grid,block,smem,stream>>>(args): en HIP se reemplaza por triple-chevron con dim3 explícito, o se invoca via hipLaunchKernelGGL. A veces hipify-perl deja el macro sin tocar — envolver manualmente."
+
+# ---- E08 — error de linker (undefined reference) ------------------------------
+# Símbolo no encontrado al linkear. Tras hipify suelen ser helpers internos
+# (__cudaPushCallConfiguration, __cudaPopCallConfiguration) que hipify
+# renombró parcialmente.
+- id: E08
+  name: linker_undefined_symbol
+  match: { msg_regex: "undefined reference to '__?(cuda|hip|CUDA|HIP)\\w*'" }
+  strategy: llm
+  tier: remote
+  notes: "Linker: símbolo de configuración CUDA no provisto por hipcc. Típicamente __cudaPushCallConfiguration/__cudaPopCallConfiguration → stubs vacíos o refactor a hipLaunchKernelGGL."
+
+# ---- E09 — include path de HIP no encontrado -----------------------------------
+# Errores cuando un header hip/xxx.h no está en el include path del proyecto.
+# NO es un include CUDA colgado (eso es E01) sino la contraparte HIP que falta.
+- id: E09
+  name: hip_include_not_found
+  match: { msg_regex: "'hip/\\w+\\.h' file not found|<hip/\\w+\\.h>" }
+  strategy: llm
+  tier: local
+  notes: "Header de HIP no encontrado: agregar -I${ROCM_PATH}/include o revisar versión de ROCm. A veces es un typo (hip/hip_runtime.h vs hip_runtime.h)."
+
+# ---- E10 — hipMemcpyToSymbol / hipGetSymbolAddress ----------------------------
+# Tras hipify, cudaMemcpyToSymbol/Address se renombran a hipMemcpyToSymbol/Address
+# que requieren envolver el símbolo en HIP_SYMBOL(x).
+- id: E10
+  name: symbol_memcpy
+  match: { msg_regex: "hipMemcpyToSymbol|hipGetSymbolAddress|hipMemcpyFromSymbol" }
+  strategy: llm
+  tier: local
+  notes: "Envolver el símbolo en HIP_SYMBOL(x) (macro que crea una variable de referencia). Regla conocida y mecánica: tier local suficiente."
+
+# ---- E11 — librerías externas (cuBLAS, cuFFT, cuDNN, cuRAND, NCCL) -------------
+# Identificadores de estas libs: rocBLAS/rocFFT/MIOpen/rocRAND/RCCL son las
+# contrapartes AMD. A veces hipify-perl no detecta el prefijo 'cu' o el nombre
+# interno difiere (cublasSgemm vs rocblas_sgemm).
+- id: E11
+  name: external_library_mismatch
+  match: { msg_regex: "cublas\\w*|cufft\\w*|cudnn\\w*|curand\\w*|nccl\\w*|cusparse\\w*|thrust::|cub::" }
+  strategy: llm
+  tier: remote
+  notes: "Librería externa CUDA: mapeo a rocBLAS/rocFFT/MIOpen/rocRAND/RCCL. Tier remoto: cambios de API entre libs (snake_case en roc, lower-level handles). Thrust → rocThrust (casi drop-in) o thrust HIP."
+
+# ---- E12 — hallazgo wave64 que generó un error de compilación -----------------
+# Cuando el linter wave64 (§5.2) detecta un patrón W0x y el código FALLA al
+# compilar con un error que el patrón predecía. Distinto de E05 (intrínsecos
+# genéricos): E12 = wave64 ESPECÍFICO (máscara 0xffffffff, &31, etc.).
+- id: E12
+  name: wave64_runtime_issue
+  match: { msg_regex: "0xffffffff|\\(unsigned|uint32_t|int\\)\\s*\\w*\\s*=\\s*__ballot|__popc\\s*\\(\\s*__ballot|\\&\\s*31\\b|>>\\s*5\\b" }
+  strategy: llm
+  tier: local
+  notes: "Wave64 detectado por linter W01-W07 que rompió compilación. Cast a 64 bits, __popc→__popcll, eliminar &31 / >>5 hardcodeados."
+
+# ---- E13 — sistema de build (CMake / Makefile / linker global) ----------------
+# Errores en archivos de build, no en código fuente CUDA/HIP. Tier remoto:
+# el formato exacto de cada CMake/Make es muy variable.
+- id: E13
+  name: build_system
+  match: { file_regex: "CMakeLists|Makefile|<link>" }
+  strategy: llm
+  tier: remote
+  notes: "Errores del sistema de build: reescribir find_package(CUDA)→HIP, eliminar nvcc flags, agregar --offload-arch=gfx942. Tier remoto: cada proyecto tiene su maña."
+
+# ---- E99 — CATCH-ALL (SIEMPRE el último) --------------------------------------
+# Match vacío = matchea cualquier grupo. La estrategia 'local_then_remote'
+# es la cadena de fallback del loop (blueprint §6.4).
+- id: E99
+  name: unknown
+  match: {}
+  strategy: llm
+  tier: local_then_remote
+  notes: "Catch-all: si el clasificador LLM (§6.5-A) tampoco clasifica con confianza ≥ 0.6, el fixer intenta local y escala a remoto. Tras max_attempts_per_group intentos fallidos, status=needs_human."
