@@ -599,3 +599,37 @@ class TestRegression:
         for fname, orig in original_bytes.items():
             assert (repo_dir / fname).read_bytes() == orig, f"{fname} not restored"
         assert gr.head_sha() == sha_before
+
+
+def test_marker_like_text_in_content_not_rejected(tmp_path):
+    """Regresión (re-audit nuevo #1): un parche cuyo SEARCH/REPLACE contiene una
+    línea con texto PARECIDO a un marcador (dentro de un string C) debe APLICAR,
+    no ser rechazado como INVALID."""
+    import subprocess
+    from core.gitrepo import GitRepo
+    repo_dir = tmp_path / "r"
+    repo_dir.mkdir()
+    f = repo_dir / "f.cu"
+    f.write_text('const char *s = "x <<<<<<< SEARCH y";\nint x = 0;\n')
+    subprocess.run(["git", "init", "-q"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=repo_dir, check=True)
+    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], cwd=repo_dir, check=True)
+    from core.patcher import apply_patch, PatchStatus, parse_blocks
+    patch = (
+        'FILE: f.cu\n<<<<<<< SEARCH\nint x = 0;\n=======\nint x = 1;\n>>>>>>> REPLACE\n'
+    )
+    # el archivo tiene una línea con "<<<<<<< SEARCH" DENTRO de un string, pero no como
+    # línea-marcador estructural → parse debe dar 1 bloque, no rechazar.
+    assert len(parse_blocks(patch)) == 1
+    res = apply_patch(patch, GitRepo(str(repo_dir)), "fix")
+    assert res.status == PatchStatus.APPLIED, res.detail
+    assert "int x = 1;" in f.read_text()
+
+
+def test_truncated_block_still_rejected():
+    """Regresión: un bloque truncado (marcador colgante) SIGUE siendo INVALID."""
+    from core.patcher import parse_blocks
+    truncated = "FILE: a.cu\n<<<<<<< SEARCH\nold\n=======\nnew\n>>>>>> REPLACE\n"  # cierre malo
+    assert parse_blocks(truncated) == []
+    dangling = "FILE: a.cu\n<<<<<<< SEARCH\nold\n"  # sin cierre
+    assert parse_blocks(dangling) == []

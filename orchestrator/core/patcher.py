@@ -67,25 +67,39 @@ _BLOCK_RE = re.compile(
     re.DOTALL,
 )
 
-_FILE_MARKER_RE = re.compile(r"(?:^|\n)[ \t]*FILE:[ \t]*[^\n]+")
-_SEARCH_MARKER_RE = re.compile(r"[ \t]*<<<<<<<[ \t]+SEARCH")
-_REPLACE_MARKER_RE = re.compile(r"[ \t]*>>>>>>>[ \t]+REPLACE")
+# Marcadores estructurales SOLO como línea completa (anclados). Un marcador que
+# aparezca DENTRO del contenido de un bloque (p.ej. un string C `"<<<<<<< SEARCH"`)
+# NO es estructural — por eso el chequeo se hace sobre el RESIDUO (el texto FUERA de
+# los bloques ya matcheados), no sobre todo el parche. (Corrige la regresión del
+# re-audit: contar marcadores globalmente rechazaba parches válidos con markers en el código.)
+_DANGLING_MARKER_RE = re.compile(
+    r"(?m)^[ \t]*(?:<<<<<<<[ \t]+SEARCH|>>>>>>>[ \t]+REPLACE|=======)[ \t]*$"
+)
 
 
 def parse_blocks(patch_text: str) -> list[Block]:
-    """Parse SEARCH/REPLACE blocks. Returns ``[]`` if ANY marker is unconsumed
-    (malformed/truncated block -- Critical fix #1: never silently ignore a
-    partially-formed block)."""
+    """Parse SEARCH/REPLACE blocks. Returns ``[]`` if a malformed/truncated block
+    leaves a DANGLING structural marker outside any well-formed block (Critical fix
+    #1: never silently ignore a partially-formed block), sin falso-rechazar parches
+    cuyo contenido contenga texto parecido a un marcador (regresión del re-audit)."""
     normalized = patch_text.replace("\r\n", "\n").replace("\r", "\n")
     blocks: list[Block] = []
+    spans: list[tuple[int, int]] = []
     for m in _BLOCK_RE.finditer(normalized):
         blocks.append(Block(file=m.group(1).strip(), search=m.group(2), replace=m.group(3)))
+        spans.append((m.start(), m.end()))
 
-    file_count = len(_FILE_MARKER_RE.findall(normalized))
-    search_count = len(_SEARCH_MARKER_RE.findall(normalized))
-    replace_count = len(_REPLACE_MARKER_RE.findall(normalized))
+    # Residuo = el parche con los bloques bien formados removidos. Cualquier marcador
+    # estructural (línea completa) que sobreviva ahí es un bloque truncado/malformado.
+    residue_parts: list[str] = []
+    last = 0
+    for start, end in spans:
+        residue_parts.append(normalized[last:start])
+        last = end
+    residue_parts.append(normalized[last:])
+    residue = "".join(residue_parts)
 
-    if file_count != len(blocks) or search_count != len(blocks) or replace_count != len(blocks):
+    if _DANGLING_MARKER_RE.search(residue):
         return []
 
     return blocks
