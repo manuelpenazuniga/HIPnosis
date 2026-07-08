@@ -21,6 +21,10 @@ class Config:
     confidence_threshold: float
     price_h100_hr: float
     price_mi300x_hr: float
+    # Umbrales de estancamiento del loop (§6.4). Con default para no romper
+    # construcciones existentes de Config (aditivo, INV-8 safe).
+    stagnation_force_remote: int = 3   # builds sin mejorar → forzar tier remoto
+    stagnation_exit: int = 5           # builds sin mejorar → salida honesta DONE_PARTIAL
 
 
 def _getenv_str(name: str, default: str) -> str:
@@ -58,6 +62,8 @@ def get_config() -> Config:
         max_iterations=_getenv_int("MAX_ITERATIONS", 25),
         max_attempts_per_group=_getenv_int("MAX_ATTEMPTS_PER_GROUP", 3),
         max_errors_parsed=_getenv_int("MAX_ERRORS_PARSED", 30),
+        stagnation_force_remote=_getenv_int("STAGNATION_FORCE_REMOTE", 3),
+        stagnation_exit=_getenv_int("STAGNATION_EXIT", 5),
         confidence_threshold=_getenv_float("CONFIDENCE_THRESHOLD", 0.6),
         price_h100_hr=_getenv_float("PRICE_H100_HR", 0.0),
         price_mi300x_hr=_getenv_float("PRICE_MI300X_HR", 0.0),
