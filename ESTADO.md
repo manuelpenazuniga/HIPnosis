@@ -59,3 +59,7 @@ T8: EN CURSO | state FSM+SQLite+driver (m3, watchpoint AD-3)
 T14a: EN CURSO | loop control build-fix §6.4 (deepseek-v4-pro, riesgo ALTO)
 T8: ESTRUCTURA: OK | state FSM+SqliteRunStore+driver; AD-3/INV-4/INV-5 verificados directo (watchpoint del arquitecto, pase asignado a mí) | MERGED (21 tests). Pendiente integración: swap InMemoryRunStore→SqliteRunStore en main.py al cablear pipeline completo.
 T14a: EN CURSO (deepseek, muy deliberado — estudiando taxonomy/errparse/oracle antes de escribir el control del loop; no colgado, CPU subiendo). Pendiente al aterrizar: verificación + audit (riesgo alto, candidato a codex) → luego T14b (cablear classify/fix/patcher reales) → cablear bsw verde en mock (criterio M2).
+T14a: ESTRUCTURA: OK | loop control §6.4 (INV-1/4/7/9/10, F-06)
+T14a: AUDIT codex/GPT-5.5: CHANGES 5 hallazgos → #1 INV-7 counters, #2 INV-9 umbrales, #3 oscilación corregidos+tests; #4/#5 deuda menor fail-safe. codex confirmó INV-10 (sin loop infinito). | MERGED (7 tests loop)
+HITO PARCIAL M2: el test green-path de T14a demuestra el loop drenando bsw 8->5->2->0 en MOCK hasta success=True → criterio mock de M2 esencialmente cumplido a nivel de loop aislado.
+FALTA para cerrar: T14b = integración (BUILD_LOOP handler real en state + propose_fix real determinista/LLM + apply_fn patcher) + swap SqliteRunStore en api + correr pipeline COMPLETO QUEUED->DONE en mock (scan->port->loop->verify-stub).
