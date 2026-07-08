@@ -34,3 +34,5 @@ T7: ESTRUCTURA: OK | scan §5.1-5.3, dificultad exacta, api_calls despoja coment
 T7: AUDIT gemini NO DISPONIBLE (agy backend colgado x3) → mergeado con pase propio del orquestador (v3 §3 degradación honesta) | MERGED
 DEUDA menor: scan importa _strip_comments_and_strings (privado) de wave64 → promover a público en T6b o follow-up
 T18: EN CURSO | dashboard estático polling 1s (qwen3.7-plus) — Track A bancar submission
+T18: ESTRUCTURA: OK | dashboard vanilla, polling after=_i (F-15), 6 secciones; nit cosmético DONE en rojo
+T18: MERGED | riesgo bajo, sin panel externo
