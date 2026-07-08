@@ -36,3 +36,5 @@ DEUDA menor: scan importa _strip_comments_and_strings (privado) de wave64 → pr
 T18: EN CURSO | dashboard estático polling 1s (qwen3.7-plus) — Track A bancar submission
 T18: ESTRUCTURA: OK | dashboard vanilla, polling after=_i (F-15), 6 secciones; nit cosmético DONE en rojo
 T18: MERGED | riesgo bajo, sin panel externo
+T20: modo replay (app/replay.py) — siembra run grabado + drip-feed reloj lazy; e2e verificado (server+curl+browser JS); 4 tests replay; auto-review orquestador (agy erratico) | MERGED
+AGY-LEARN: el auditor agy/Gemini a veces intenta EJECUTAR pytest en vez de solo leer → cuelga 0 bytes. Futuro: brief de audit debe decir "NO ejecutes comandos ni corras tests; revisá SOLO leyendo".
