@@ -26,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api import router
+from app.replay import bootstrap_replay
 from app.store import InMemoryRunStore
 
 
@@ -53,6 +54,10 @@ def create_app() -> FastAPI:
     app = FastAPI(title="HIPnosis orchestrator", version="0.1.0")
 
     app.state.store = InMemoryRunStore()
+
+    # AD-4: en ORACLE_MODE=replay, sembrar el run grabado + su reloj de replay.
+    # En cualquier otro modo devuelve None y no hace nada.
+    app.state.replay = bootstrap_replay(app.state.store)
 
     # Register API routes BEFORE the static mount so they win the
     # routing match (Starlette picks the first prefix-match in
