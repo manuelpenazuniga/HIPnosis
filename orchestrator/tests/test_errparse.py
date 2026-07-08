@@ -145,3 +145,16 @@ def test_parse_ignores_meta_lines() -> None:
     errors = parse(raw)
     assert len(errors) == 1
     assert errors[0].message == "bad"
+
+
+def test_error_without_column_is_parsed():
+    """hipcc/clang a veces emiten error sin columna: 'foo.cu:42: fatal error: ...'
+    (hallazgo HIGH audit Gemini). Debe parsearse con col=0, no descartarse."""
+    from core.errparse import parse
+    raw = "src/foo.cu:42: fatal error: 'cuda_runtime.h' file not found\n"
+    errs = parse(raw)
+    assert len(errs) == 1
+    assert errs[0].file == "src/foo.cu"
+    assert errs[0].line == 42
+    assert errs[0].col == 0
+    assert "cuda_runtime.h" in errs[0].message

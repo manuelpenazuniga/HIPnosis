@@ -25,7 +25,7 @@ from core.schemas import BuildError, ErrorGroup
 # ``file`` cannot contain ':' or newlines; paths with colons (Windows,
 # LDAP-style) are out of scope for the ROCm/Linux target.
 _FILE_LINE_COL_RE = re.compile(
-    r"^(?P<file>[^:\n]+):(?P<line>\d+):(?P<col>\d+):\s+"
+    r"^(?P<file>[^:\n]+):(?P<line>\d+)(?::(?P<col>\d+))?:\s+"
     r"(?P<sev>error|fatal error):\s+(?P<msg>.*)$"
 )
 
@@ -110,7 +110,7 @@ def parse(raw_output: str, max_errors: int = 30) -> list[BuildError]:
                 BuildError(
                     file=file,
                     line=int(m.group("line")),
-                    col=int(m.group("col")),
+                    col=int(m.group("col")) if m.group("col") is not None else 0,
                     message=m.group("msg"),
                     signature=signature(file, m.group("msg")),
                 )
