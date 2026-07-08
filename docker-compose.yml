@@ -1,0 +1,69 @@
+# docker-compose.yml — dos perfiles (blueprint §9):
+#   replay : `docker compose --profile replay up`  → CUALQUIER laptop, sin GPU.
+#            Levanta el dashboard vivo con un trace grabado. Es como los jueces
+#            reproducen el proyecto sin MI300X (F-16). ES LA PRIMERA INSTRUCCIÓN DEL README.
+#   gpu    : `docker compose --profile gpu up`     → droplet MI300X (real).
+#            Orquestador ROCm + vLLM con Gemma. Se valida en M0.
+
+services:
+  # --- PERFIL REPLAY (jueces / demo sin GPU) ---
+  orchestrator-replay:
+    profiles: ["replay"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.replay
+    environment:
+      ORACLE_MODE: replay
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # --- PERFIL GPU (droplet MI300X real) ---
+  orchestrator:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      ORACLE_MODE: real
+      LOCAL_LLM_BASE_URL: http://vllm:8000/v1
+      LOCAL_LLM_MODEL: google/gemma-3-27b-it
+      GPU_ARCH: gfx942
+    env_file:
+      - orchestrator/.env            # secretos (FIREWORKS_API_KEY, HF_TOKEN, GITHUB_TOKEN); NO versionado
+    ports:
+      - "8080:8080"
+    # Acceso a la GPU AMD (KFD/DRI) para los builds hipcc y la ejecución de kernels.
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ./workspaces:/app/orchestrator/workspaces    # repos git por run (persistidos)
+    depends_on:
+      - vllm
+    restart: unless-stopped
+
+  # vLLM con Gemma 3 27B IT — imagen OFICIAL, no se compila nada (F-01).
+  vllm:
+    profiles: ["gpu"]
+    image: rocm/vllm:latest
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}                          # Gemma es gated (F-01c)
+    command: >
+      --model google/gemma-3-27b-it
+      --max-model-len 32768
+    ports:
+      - "8000:8000"
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+    security_opt:
+      - seccomp:unconfined
+    ipc: host
+    restart: unless-stopped
