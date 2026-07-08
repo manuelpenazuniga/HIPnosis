@@ -23,7 +23,10 @@ class ParityResult:
     n_compared: int = 0
 
 
-_NUMBER_RE = re.compile(r"[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
+# audit MEDIUM: lookbehind para no capturar números pegados a identificadores/paths
+# (p.ej. el '3' de 'v3.0' o 'file2.txt'). Los rangos tipo '1-2' siguen siendo ambiguos
+# (el '-2' se lee como negativo) — limitación documentada; el golden de repos demo es estructurado.
+_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_.])[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?")
 
 _NAN_INF_RE = re.compile(r"[-+]?\b(?:nan|inf(?:inity)?)\b", re.IGNORECASE)
 
@@ -108,11 +111,23 @@ def _values_close(a: float, e: float, rtol: float, atol: float) -> bool:
 
 
 def check_self_check(stdout: str, pass_regex: str) -> ParityResult:
-    """Modo self_check: el benchmark imprime PASS/FAIL."""
-    ok = re.search(pass_regex, stdout) is not None
+    """Modo self_check: el benchmark imprime su veredicto en una línea.
+
+    F-17/audit CRITICAL: el pass_regex se busca POR LÍNEA, y se ignoran las líneas que
+    son un veredicto de FALLO (contienen ``\bFAIL\b``). Así ``FAIL: PASS not reached`` NO
+    se certifica como PASS (aunque contenga el substring 'PASS'), pero casos legítimos como
+    ``Tests completed: PASS`` o ``result: OK (1234)`` sí. (``\bFAIL\b`` word-bounded no
+    excluye 'failures'; el caso '0 failures' como PASS es una limitación documentada.)
+    """
+    pat = re.compile(pass_regex)
+    fail_re = re.compile(r"\bFAIL\b", re.IGNORECASE)
+    ok = any(
+        pat.search(line) and not fail_re.search(line)
+        for line in stdout.splitlines()
+    )
     return ParityResult(
         ok=ok,
-        detail=f"self_check: patron '{pass_regex}' {'encontrado' if ok else 'no encontrado'}",
+        detail=f"self_check: patron de linea '{pass_regex}' {'encontrado' if ok else 'no encontrado'}",
     )
 
 
@@ -125,4 +140,11 @@ def check_golden(
     """Modo golden_output: extrae floats de stdout y golden_text, comparalos."""
     actual = extract_floats(stdout)
     expected = extract_floats(golden_text)
+    # F-17/audit HIGH: "nada que comparar" NO certifica paridad numérica. Si el golden
+    # (o la salida) no tiene números, no se puede afirmar PASS por golden_output.
+    if not actual and not expected:
+        return ParityResult(
+            ok=False,
+            detail="golden_output: sin valores numericos para comparar (no se certifica)",
+        )
     return compare_floats(actual, expected, rtol, atol)

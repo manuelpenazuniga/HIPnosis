@@ -244,3 +244,28 @@ def test_result_dataclass():
     assert r.ok
     assert r.detail == "todo bien"
     assert r.n_compared == 42
+
+
+def test_self_check_no_false_pass_on_substring():
+    """audit CRITICAL: 'FAIL: PASS not reached' NO debe certificar PASS (F-17)."""
+    from core.parity import check_self_check
+    assert check_self_check("FAIL: PASS not reached\n", "PASS").ok is False
+    assert check_self_check("FAIL\n", "PASS").ok is False
+    # el caso legítimo (softmax imprime 'PASS' en su propia línea) SIGUE funcionando:
+    assert check_self_check("running...\nPASS\n", "PASS").ok is True
+    assert check_self_check("PASS", "PASS").ok is True
+
+
+def test_golden_empty_does_not_certify():
+    """audit HIGH: sin números que comparar NO se certifica paridad."""
+    from core.parity import check_golden
+    assert check_golden("no numbers here", "none either").ok is False
+
+
+def test_extract_floats_ignores_numbers_glued_to_identifiers():
+    """audit MEDIUM: '3' de 'v3.0' o 'file2' no se captura como valor."""
+    from core.parity import extract_floats
+    # 'result=7.5' sí captura 7.5; 'v3' no captura el 3.
+    got = extract_floats("path /opt/v3/out  result=7.5  score 12")
+    assert 7.5 in got and 12.0 in got
+    assert 3.0 not in got   # el 3 de v3 está pegado a identificador
