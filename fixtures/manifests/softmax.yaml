@@ -1,0 +1,12 @@
+# Manifiesto demo softmax-cuda (§7.1). Repo FÁCIL: port mecánico + self_check limpio.
+# Escrito a mano (curación legítima §7.1); el producto real lo pediría al usuario.
+build:
+  cmd: "make -f Makefile"
+  dir: "."
+run:
+  cmd: "./main 100000 784 0 100"
+  timeout_s: 120
+verify:
+  mode: self_check          # el benchmark imprime PASS/FAIL (main.cu:146 printf ok?"PASS":"FAIL")
+  pass_regex: "PASS"
+timing_regex: "Average .*?([0-9.]+) *\\(?us\\)?"

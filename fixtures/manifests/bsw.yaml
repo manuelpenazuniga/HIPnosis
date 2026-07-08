@@ -1,0 +1,18 @@
+# Manifiesto demo bsw-cuda (§7.1). Repo WAVE64: Smith-Waterman, dispara W01/W02/W04/W05.
+# Verificación por golden: el benchmark escribe scores de alineamiento a un archivo y el
+# Makefile hace `diff test_regression_protein_out result_aa`. Scores deterministas (enteros).
+# NOTA para verify.py (T15c): el output va a un ARCHIVO (test_regression_protein_out), no a stdout;
+# golden_output debe comparar ese archivo contra golden_file. rtol/atol aplican por si hay floats.
+build:
+  cmd: "make -f Makefile"
+  dir: "."
+run:
+  cmd: "./main ./test-data/protein-reference.fasta ./test-data/protein-query.fasta test_regression_protein_out"
+  timeout_s: 300
+verify:
+  mode: golden_output
+  golden_file: "test-data/result_aa"
+  output_file: "test_regression_protein_out"    # extensión al schema: output a archivo (no stdout)
+  numeric_rtol: 1e-5
+  numeric_atol: 1e-8
+timing_regex: "Total .*?([0-9.]+) *\\(?s\\)?"
