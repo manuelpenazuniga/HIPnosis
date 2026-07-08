@@ -1,0 +1,28 @@
+[project]
+name = "hipnosis-orchestrator"
+version = "0.1.0"
+description = "HIPnosis — agente autónomo que porta CUDA a ROCm/HIP"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
+    "gitpython>=3.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "core*"]
