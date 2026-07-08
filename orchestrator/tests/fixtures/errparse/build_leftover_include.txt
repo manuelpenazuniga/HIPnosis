@@ -1,0 +1,6 @@
+hipcc -O2 --offload-arch=gfx942 -I/usr/local/cuda/include -c src/main.cpp -o build/main.o
+In file included from src/main.cpp:5:
+/usr/local/cuda/include/cuda_runtime.h:1:10: fatal error: 'cuda_runtime.h' file not found
+#include <cuda_runtime.h>
+         ^~~~~~~~~~~~~~~
+1 error generated.
