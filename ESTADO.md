@@ -52,3 +52,6 @@ T10: ESTRUCTURA: OK | taxonomy 14 clases (E99 último), classify validado contra
 T13: EN CURSO | port (hipify-seam mock-aware) + buildsys (adaptación Makefile/CMake) (m3)
 T11: AUDIT codex/GPT-5.5: CHANGES — 6 bugs adversariales (2 Crit: bloque malformado ignorado, alias de path; 2 High: symlink escapa workspace, excepciones sin revert; 2 Med: CRLF fuera de bloque, re-búsqueda [0] ambigua). Panel en riesgo alto justificado (mi pase solo olió 1). → ronda de fix a deepseek. Hallazgos en .agents/audit-t11-codex-findings.md
 T13: ESTRUCTURA: OK | port hipify-seam mock-aware + buildsys (validado Makefile bsw real); deuda menor: -arch=$(VAR) forma variable (loop lo atrapa E13) | MERGED (pase propio, 46 tests)
+T11: ESTRUCTURA: OK | patcher unicidad dura + all-or-nothing (diseño arquitecto)
+T11: AUDIT codex/GPT-5.5 (2 rondas): 6 bugs corrupción → resueltos; 2 regresiones del fix → #1 (marker-in-content) fixeado por orquestador + test, #2/#6 deuda fail-safe casi-imposible (chmod-mode, índice-en-commit-fail). Panel riesgo alto JUSTIFICADO. | MERGED (35 tests)
+DEUDA fail-safe T11: restore hace chmod 0644 (pierde modo ejecutable); commit-failure deja índice staged. Ambos casi-imposibles en este pipeline.
