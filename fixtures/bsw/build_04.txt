@@ -1,0 +1,4 @@
+hipcc -O3 --offload-arch=gfx942 -c kernel.cu -o kernel.o
+hipcc -O3 --offload-arch=gfx942 -c main.cu -o main.o
+hipcc -O3 --offload-arch=gfx942 kernel.o main.o -o main
+Build succeeded.

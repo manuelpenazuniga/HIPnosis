@@ -1,0 +1,4 @@
+hipcc -O3 --offload-arch=gfx942 -c kernel.cu -o kernel.o
+kernel.cu:13:20: error: use of undeclared identifier '__ballot_sync'; did you mean '__ballot'?
+kernel.cu:41:18: error: use of undeclared identifier '__shfl_down_sync'; did you mean '__shfl_down'?
+2 errors generated when compiling for gfx942.

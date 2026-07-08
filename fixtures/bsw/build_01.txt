@@ -1,0 +1,16 @@
+hipcc -O3 --offload-arch=gfx942 -c kernel.cu -o kernel.o
+kernel.cu:3:10: fatal error: 'cuda_runtime.h' file not found
+    3 | #include <cuda_runtime.h>
+      |          ^~~~~~~~~~~~~~~~~
+main.cu:5:10: fatal error: 'cuda_runtime.h' file not found
+    5 | #include <cuda_runtime.h>
+      |          ^~~~~~~~~~~~~~~~~
+kernel_wrapper.cu:2:10: fatal error: 'cuda_runtime.h' file not found
+    2 | #include <cuda_runtime.h>
+      |          ^~~~~~~~~~~~~~~~~
+main.cu:88:5: error: use of undeclared identifier 'cudaMemcpyToSymbol'
+main.cu:141:9: error: use of undeclared identifier 'cudaMemcpyToSymbol'
+kernel_wrapper.cu:57:5: error: use of undeclared identifier 'cudaMemcpyToSymbol'
+kernel.cu:13:20: error: use of undeclared identifier '__ballot_sync'; did you mean '__ballot'?
+kernel.cu:41:18: error: use of undeclared identifier '__shfl_down_sync'; did you mean '__shfl_down'?
+3 errors generated when compiling for gfx942.
