@@ -42,3 +42,7 @@ T20: MERGED (de verdad) c6a033c | 99 tests en main; corrección: el merge previo
 T19: ESTRUCTURA: OK | docker compose perfiles replay|gpu + Dockerfiles; perfil replay VERIFICADO e2e (docker build+up, dashboard+API :8080, run sembrado, drip-feed); gpu YAML válido (M0). | MERGED
 === HITO: TRACK A (submission ejecutable) BANCADO ===
 docker compose --profile replay up → dashboard vivo de un port bsw-cuda real en cualquier laptop sin GPU (F-16). Verificado end-to-end. Requisito DURO del hackathon cumplido.
+=== TRACK B (loop) arrancado ===
+T11: EN CURSO | patcher SEARCH/REPLACE unicidad dura (deepseek-v4-pro, riesgo ALTO, diseño arquitecto)
+T10: EN CURSO | taxonomy rules.yaml + classify (m3)
+T12: EN CURSO | llm client/router/prompts (m3)
