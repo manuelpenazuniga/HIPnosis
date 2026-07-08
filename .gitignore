@@ -16,3 +16,5 @@ workspaces/
 .agents/ARCHITECT_ANSWER.md
 # Worktrees de tareas
 ../HIPnosis-t*
+# Workspaces del pipeline dentro de orchestrator
+orchestrator/workspaces/

@@ -25,9 +25,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+import os
+
 from app.api import router
 from app.replay import bootstrap_replay
 from app.store import InMemoryRunStore
+from core.config import get_config
+from core.state import SqliteRunStore
 
 
 _DASHBOARD_CANDIDATES = (
@@ -44,16 +48,32 @@ def _resolve_dashboard_dir() -> Path | None:
     return None
 
 
-def create_app() -> FastAPI:
+def create_app(autorun: bool = False) -> FastAPI:
     """Build a fresh ``FastAPI`` app.
 
     A factory (not a module-level singleton) keeps the test suite
     hermetic: each ``TestClient`` can construct an isolated app with its
     own store and its own (possibly monkey-patched) resolver.
+
+    ``autorun`` (producción): si True, ``POST /runs`` dispara el pipeline en un
+    thread de fondo (via core.runner) y el store es un SQLite de ARCHIVO
+    (compartido entre el thread de la request y el del pipeline). Por defecto
+    False → store en memoria y SIN ejecución (los tests de api quedan herméticos).
     """
     app = FastAPI(title="HIPnosis orchestrator", version="0.1.0")
 
-    app.state.store = InMemoryRunStore()
+    config = get_config()
+    app.state.config = config
+    app.state.autorun = autorun
+
+    if autorun:
+        db_path = str(Path(__file__).resolve().parent.parent / "workspaces" / "runs.db")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        app.state.db_path = db_path
+        app.state.store = SqliteRunStore(db_path)
+    else:
+        app.state.db_path = None
+        app.state.store = InMemoryRunStore()
 
     # AD-4: en ORACLE_MODE=replay, sembrar el run grabado + su reloj de replay.
     # En cualquier otro modo devuelve None y no hace nada.
@@ -75,4 +95,6 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
+# Entrypoint de producción (uvicorn app.main:app): autorun activado → POST /runs
+# ejecuta el pipeline. Los tests construyen su propia app con create_app() (autorun=False).
+app = create_app(autorun=True)

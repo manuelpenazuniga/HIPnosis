@@ -44,6 +44,14 @@ class CreateRunBody(BaseModel):
 
 
 def _get_store(request: Request) -> _WorkspacesLike:
+    # En modo autorun el store es un SQLite de ARCHIVO con check_same_thread=True:
+    # uvicorn corre cada handler en un thread distinto, así que abrimos una conexión
+    # FRESCA por request (en el thread correcto). El archivo comparte estado entre
+    # conexiones. En tests (db_path=None) usamos el store en memoria de app.state.
+    db_path = getattr(request.app.state, "db_path", None)
+    if db_path:
+        from core.state import SqliteRunStore
+        return SqliteRunStore(db_path)
     store = getattr(request.app.state, "store", None)
     if store is None:
         raise HTTPException(status_code=500, detail="run store not configured")
@@ -70,14 +78,38 @@ def trace_path_for_run(run_id: str) -> str:
 
 @router.post("/runs", response_model=Run, status_code=200)
 def create_run(body: CreateRunBody, request: Request) -> Run:
-    """Enqueue a run.
+    """Enqueue a run y (en producción) dispará el pipeline en un thread de fondo.
 
-    AD-3 / INV-1: we only *register* the run as ``QUEUED``. No phase runs
-    here. The future ``core.state`` task will pick the run up and drive
-    it through the FSM.
+    AD-3: la api NO ejecuta fases inline; registra el run como ``QUEUED`` y delega
+    la conducción al driver de state (via ``core.runner.execute_run``) en un thread
+    aparte, para que POST devuelva de inmediato y el dashboard vea la corrida en vivo
+    por polling. Si ``app.state.autorun`` es False (tests) solo se encola.
     """
     store = _get_store(request)
-    return store.create(body.repo_url)
+    run = store.create(body.repo_url)
+
+    app = request.app
+    config = getattr(app.state, "config", None)
+    autorun = getattr(app.state, "autorun", False)
+    db_path = getattr(app.state, "db_path", None)
+    # replay no ejecuta pipeline (AD-4); tampoco sin autorun/db_path.
+    if autorun and db_path and config is not None and config.oracle_mode != "replay":
+        import threading
+
+        from core.runner import execute_run
+        from core.state import SqliteRunStore
+
+        def _bg(run_id: str) -> None:
+            # El thread de fondo abre SU PROPIA conexión SQLite (check_same_thread=True).
+            worker_store = SqliteRunStore(db_path)
+            try:
+                execute_run(run_id, worker_store, config)
+            except Exception:  # noqa: BLE001 — INV-5: nunca tumbar el server por un run
+                pass
+
+        threading.Thread(target=_bg, args=(run.id,), daemon=True).start()
+
+    return run
 
 
 @router.get("/runs", response_model=list[Run])
