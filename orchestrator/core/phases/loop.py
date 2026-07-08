@@ -96,8 +96,15 @@ def _detect_oscillating(
     oscillating: set[str] = set()
     for sig in all_sigs:
         presence = [sig in s for s in history]
+        # Una "reaparición" es un False→True DESPUÉS de la primera aparición
+        # (la aparición inicial NO cuenta — fix del re-audit #3). Se necesitan
+        # >=2 reapariciones = present→absent→present ocurrido dos veces.
+        try:
+            first = presence.index(True)
+        except ValueError:
+            continue
         reappearances = sum(
-            1 for i in range(1, len(presence))
+            1 for i in range(first + 1, len(presence))
             if not presence[i - 1] and presence[i]
         )
         if reappearances >= 2 and sig in current:
@@ -183,8 +190,8 @@ def run_build_loop(
         else:
             no_progress = 0
 
-        # INV-10: 5 consecutive non-improving builds → honest exit
-        if no_progress >= 5:
+        # INV-10/INV-9: N consecutive non-improving builds → honest exit (umbral de config)
+        if no_progress >= cfg.stagnation_exit:
             counters.errors_current = result.count
             counters.iterations = iteration
             for g in groups:
@@ -229,14 +236,17 @@ def run_build_loop(
         if g.signature in oscillating:
             tier = "remote"
 
-        # §6.4: force remote after 3 consecutive non-improving builds
-        if no_progress >= 3:
+        # §6.4/INV-9: force remote after N consecutive non-improving builds (umbral de config)
+        if no_progress >= cfg.stagnation_force_remote:
             tier = "remote"
 
         # --- FIX ---
         patch = propose_fix_fn(g, tier, g.attempts)
-        delta = apply_fn(patch, f"fix({klass}): iter {iteration} [tier={tier}]")
-        applied = delta <= 0 and patch != ""
+        # No llamar apply con patch vacío (propose_fix no produjo nada): es un intento fallido.
+        delta = apply_fn(patch, f"fix({klass}): iter {iteration} [tier={tier}]") if patch != "" else 1
+        # "applied" = mejoró de VERDAD (INV-7/F-17: solo así cuenta como fix). Un patch vacío o
+        # que no bajó errores (delta>=0) NO es un fix — consume un intento del grupo.
+        applied = patch != "" and delta < 0
 
         trace.emit(
             "fix",
@@ -250,15 +260,16 @@ def run_build_loop(
         )
 
         # --- UPDATE STATE ---
-        if delta > 0:
-            g.attempts += 1
-        else:
+        if applied:
             if tier == "deterministic":
                 counters.fixes_deterministic += 1
             elif tier == "local":
                 counters.fixes_local += 1
             elif tier == "remote":
                 counters.fixes_remote += 1
+        else:
+            # patch vacío, sin cambio (delta==0) o empeoró (delta>0) → intento fallido consumido.
+            g.attempts += 1
 
         prev_errors = result.count
         iteration += 1

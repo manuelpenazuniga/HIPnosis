@@ -272,3 +272,57 @@ def test_revert_on_worsening_exhausts_group(tmp_path: Path) -> None:
     for sig in result.needs_human:
         assert len(sig) == 40, f"signature must be 40-char sha1, got {len(sig)}: {sig}"
         assert all(c in "0123456789abcdef" for c in sig)
+
+
+# ---------------------------------------------------------------------------
+# Regresión — hallazgos del re-audit codex de T14a
+# ---------------------------------------------------------------------------
+
+def test_detect_oscillating_ignores_initial_appearance():
+    """Re-audit #3: la PRIMERA aparición de una signature no es una reaparición.
+    history=[∅,{S},∅,{S}] tiene UNA sola reaparición real → NO oscila."""
+    from core.phases.loop import _detect_oscillating
+    hist = [set(), {"S"}, set(), {"S"}]
+    assert _detect_oscillating(hist, {"S"}) == set()          # 1 reaparición, no alcanza
+    # Con DOS reapariciones reales (T,F,T,F,T) sí oscila:
+    hist2 = [{"S"}, set(), {"S"}, set(), {"S"}]
+    assert "S" in _detect_oscillating(hist2, {"S"})
+
+
+def test_stagnation_exit_threshold_from_config(tmp_path):
+    """Re-audit #2: el umbral de salida por estancamiento sale de config (no hardcode 5)."""
+    # Oracle que devuelve SIEMPRE los mismos 2 errores (nunca mejora).
+    class _StuckOracle:
+        def build(self):
+            from core.schemas import BuildResult
+            raw = ("a.cu:1:1: error: use of undeclared identifier 'cudaMalloc'\n"
+                   "b.cu:2:1: error: use of undeclared identifier 'cudaFree'\n")
+            return BuildResult(ok=False, count=2, raw_output=raw, returncode=1)
+    cfg = _make_config(max_iterations=25, stagnation_exit=2, stagnation_force_remote=1)
+    trace = _make_trace(tmp_path)
+    res = run_build_loop(_StuckOracle(), cfg, trace,
+                         _classify_e01, decide_tier,
+                         lambda g, t, a: "FILE: a.cu\n<<<<<<< SEARCH\nx\n=======\ny\n>>>>>>> REPLACE",
+                         lambda p, m: 0)   # apply nunca mejora (delta 0)
+    # Con stagnation_exit=2 debe cortar MUCHO antes de max_iterations=25.
+    assert res.success is False
+    assert res.iterations < 25
+
+
+def test_empty_patch_does_not_inflate_counters(tmp_path):
+    """Re-audit #1 (INV-7/F-17): un patch vacío NO cuenta como fix; consume intento."""
+    class _StuckOracle:
+        def build(self):
+            from core.schemas import BuildResult
+            raw = "a.cu:1:1: error: use of undeclared identifier 'cudaMalloc'\n"
+            return BuildResult(ok=False, count=1, raw_output=raw, returncode=1)
+    cfg = _make_config(max_iterations=5, max_attempts_per_group=2)
+    trace = _make_trace(tmp_path)
+    res = run_build_loop(_StuckOracle(), cfg, trace,
+                         _classify_e01, decide_tier,
+                         lambda g, t, a: "",       # propose_fix no produce patch
+                         lambda p, m: 0)
+    # Ningún fix real → todos los counters de fixes en 0 (no inflados).
+    assert res.counters.fixes_deterministic == 0
+    assert res.counters.fixes_local == 0
+    assert res.counters.fixes_remote == 0
