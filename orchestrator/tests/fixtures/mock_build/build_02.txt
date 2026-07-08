@@ -1,0 +1,5 @@
+hipcc -O3 --offload-arch=gfx942 -std=c++17 src/main.cpp -o main
+src/main.cpp:128:18: error: use of undeclared identifier 'cudaDeviceSynchronize'
+   128 |   cudaDeviceSynchronize();
+      |                  ^
+1 error generated.
