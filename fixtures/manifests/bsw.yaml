@@ -13,6 +13,6 @@ verify:
   mode: golden_output
   golden_file: "test-data/result_aa"
   output_file: "test_regression_protein_out"    # extensión al schema: output a archivo (no stdout)
-  numeric_rtol: 1e-5
-  numeric_atol: 1e-8
+  numeric_rtol: 1.0e-5
+  numeric_atol: 1.0e-8
 timing_regex: "Total .*?([0-9.]+) *\\(?s\\)?"
