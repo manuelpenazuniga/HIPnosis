@@ -1,0 +1,28 @@
+{"ts":"2026-07-08T14:00:00.000000+00:00","run":"run_bsw01a2","ev":"phase","phase":"QUEUED"}
+{"ts":"2026-07-08T14:00:00.400000+00:00","run":"run_bsw01a2","ev":"run_meta","repo_url":"https://github.com/zjin-lcf/HeCBench (src/bsw-cuda)","oracle_mode":"real","gpu_arch":"gfx942"}
+{"ts":"2026-07-08T14:00:01.000000+00:00","run":"run_bsw01a2","ev":"phase","phase":"CLONING"}
+{"ts":"2026-07-08T14:00:03.200000+00:00","run":"run_bsw01a2","ev":"clone","files":9,"branch":"hipnosis/rocm-port"}
+{"ts":"2026-07-08T14:00:03.500000+00:00","run":"run_bsw01a2","ev":"phase","phase":"SCANNING"}
+{"ts":"2026-07-08T14:00:04.100000+00:00","run":"run_bsw01a2","ev":"scan","files_cuda":2,"loc_kernels":788,"build_system":"make","difficulty":"medium","api_calls":{"cudaMalloc":6,"cudaMemcpy":10,"cudaFree":6,"cudaDeviceSynchronize":2}}
+{"ts":"2026-07-08T14:00:04.300000+00:00","run":"run_bsw01a2","ev":"wave64","file":"kernel.cu","line":13,"pattern":"W01"}
+{"ts":"2026-07-08T14:00:04.320000+00:00","run":"run_bsw01a2","ev":"wave64","file":"kernel.cu","line":13,"pattern":"W02"}
+{"ts":"2026-07-08T14:00:04.700000+00:00","run":"run_bsw01a2","ev":"phase","phase":"PORTING"}
+{"ts":"2026-07-08T14:00:06.900000+00:00","run":"run_bsw01a2","ev":"port","tool":"hipify-perl","files_converted":2,"build_adapted":true,"commit":"c1a2b3d"}
+{"ts":"2026-07-08T14:00:07.200000+00:00","run":"run_bsw01a2","ev":"phase","phase":"BUILD_LOOP"}
+{"ts":"2026-07-08T14:00:12.500000+00:00","run":"run_bsw01a2","ev":"build","iteration":1,"errors":8,"delta":0}
+{"ts":"2026-07-08T14:00:12.800000+00:00","run":"run_bsw01a2","ev":"classify","sig":"a1b2c3d4","klass":"E01","tier":"deterministic","confidence":0.99}
+{"ts":"2026-07-08T14:00:13.100000+00:00","run":"run_bsw01a2","ev":"fix","sig":"a1b2c3d4","tier":"deterministic","applied":true,"delta":-3,"commit":"d4e5f60","tokens":0}
+{"ts":"2026-07-08T14:00:18.300000+00:00","run":"run_bsw01a2","ev":"build","iteration":2,"errors":5,"delta":-3}
+{"ts":"2026-07-08T14:00:18.600000+00:00","run":"run_bsw01a2","ev":"classify","sig":"b2c3d4e5","klass":"E02","tier":"deterministic","confidence":0.97}
+{"ts":"2026-07-08T14:00:18.900000+00:00","run":"run_bsw01a2","ev":"fix","sig":"b2c3d4e5","tier":"deterministic","applied":true,"delta":-3,"commit":"e5f6a71","tokens":0}
+{"ts":"2026-07-08T14:00:24.100000+00:00","run":"run_bsw01a2","ev":"build","iteration":3,"errors":2,"delta":-3}
+{"ts":"2026-07-08T14:00:24.500000+00:00","run":"run_bsw01a2","ev":"classify","sig":"c3d4e5f6","klass":"E05","tier":"local","confidence":0.91}
+{"ts":"2026-07-08T14:00:26.800000+00:00","run":"run_bsw01a2","ev":"fix","sig":"c3d4e5f6","tier":"local","applied":true,"delta":-2,"commit":"f6a7b82","tokens":438}
+{"ts":"2026-07-08T14:00:32.000000+00:00","run":"run_bsw01a2","ev":"build","iteration":4,"errors":0,"delta":-2}
+{"ts":"2026-07-08T14:00:32.200000+00:00","run":"run_bsw01a2","ev":"phase","phase":"RUNNING"}
+{"ts":"2026-07-08T14:00:35.600000+00:00","run":"run_bsw01a2","ev":"exec","cmd":"./main test/data","exit_code":0,"wall_s":3.1}
+{"ts":"2026-07-08T14:00:35.800000+00:00","run":"run_bsw01a2","ev":"phase","phase":"PARITY"}
+{"ts":"2026-07-08T14:00:36.200000+00:00","run":"run_bsw01a2","ev":"verify","verdict":"PASS","detail":"benchmark self-check (imprime PASS): scores idénticos a la referencia CPU interna"}
+{"ts":"2026-07-08T14:00:36.400000+00:00","run":"run_bsw01a2","ev":"phase","phase":"REPORTING"}
+{"ts":"2026-07-08T14:00:37.000000+00:00","run":"run_bsw01a2","ev":"report","fixes_deterministic":6,"fixes_local":2,"fixes_remote":0,"tokens_local":438,"tokens_remote":0,"errors_initial":8,"iterations":4,"wave64_findings":2}
+{"ts":"2026-07-08T14:00:37.200000+00:00","run":"run_bsw01a2","ev":"phase","phase":"DONE"}
