@@ -28,3 +28,8 @@ T6: MERGED | baseline §5.2, 28 tests verdes
 T6b: PENDIENTE | calibrar catálogo wave64 contra repos reales (bsw/softmax); insumo: .agents/audit-t6-findings.md (Gemini: mayúsculas máscara, word boundaries, long int falso pos, tiled_partition funcional, hex &0x1f). Validar SIN introducir falsos negativos.
 LANE3 (CP-1 ola1): demo-run.jsonl hand-authored (banca replay, 28 ev QUEUED->DONE, verify PASS) MERGED; golden fixtures bsw build_01-04 (gate fixture-first) MERGED; errparse revalidado contra fixtures reales OK (deuda #2/#3 no se dispara en demo repos).
 T9: EN CURSO (api, m3) | T7: EN CURSO (scan, m3)
+T9: ESTRUCTURA: OK | api L6, AD-3 (control por store, no fases inline), events?after=N vía read_events
+T9: AUDITED gemini 3.1 pro: APPROVED | MERGED (nota: T20 registra run replay en store + coloca demo-run.jsonl)
+T7: ESTRUCTURA: OK | scan §5.1-5.3, dificultad exacta, api_calls despoja comentarios, F-17; 19 tests+AST purity
+T7: AUDIT gemini NO DISPONIBLE (agy backend colgado x3) → mergeado con pase propio del orquestador (v3 §3 degradación honesta) | MERGED
+DEUDA menor: scan importa _strip_comments_and_strings (privado) de wave64 → promover a público en T6b o follow-up
