@@ -1,0 +1,7 @@
+device: AMD Instinct MI300X (gfx942)
+Running self-check...
+[ok] kernel launch
+[ok] device memcpy
+[ok] result verification
+max abs error vs reference: 0.000000
+PASS

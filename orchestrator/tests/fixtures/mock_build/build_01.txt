@@ -1,0 +1,16 @@
+hipcc -O3 --offload-arch=gfx942 -std=c++17 src/main.cpp -o main
+In file included from src/main.cpp:1:
+src/main.cpp:12:10: fatal error: 'cuda_runtime.h' file not found
+    12 | #include <cuda_runtime.h>
+      |          ^~~~~~~~~~~~~~~~~~
+1 error generated.
+src/main.cpp:45:3: error: use of undeclared identifier 'cudaMemcpy'
+    45 |   cudaMemcpy(d_a, h_a, N * sizeof(float), cudaMemcpyHostToDevice);
+      |   ^
+src/main.cpp:78:5: error: use of undeclared identifier 'cudaMalloc'
+    78 |   cudaMalloc((void **)&d_a, N * sizeof(float));
+      |   ^
+src/main.cpp:92:14: error: no member named 'threadIdx' in 'hipLaunchParams'
+    92 |   int tid = hipLaunchParams.threadIdx.x;
+      |              ^
+4 errors generated.

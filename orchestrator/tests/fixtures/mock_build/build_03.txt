@@ -1,0 +1,3 @@
+hipcc -O3 --offload-arch=gfx942 -std=c++17 src/main.cpp -o main
+Compilation finished successfully.
+Build succeeded.
