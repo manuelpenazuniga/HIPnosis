@@ -47,3 +47,4 @@ T11: EN CURSO | patcher SEARCH/REPLACE unicidad dura (deepseek-v4-pro, riesgo AL
 T10: EN CURSO | taxonomy rules.yaml + classify (m3)
 T12: EN CURSO | llm client/router/prompts (m3)
 T6b: VALIDADO (análisis, sin cambio de código) | wave64 baseline corrido contra bsw/softmax REALES: CERO falsos positivos. bsw dispara W01+W02 (kernel.cu:13 __ballot_sync 0xffffffff), W04 (shfl width=32 en 278/279/302), W05 (laneId%32 en 54/55) — TODOS reales. Tightening de Gemini (mayúsculas/word-boundary) solo afecta casos ausentes en demos → deuda NO urgente, baja prioridad. Arma diferencial validada.
+T12: ESTRUCTURA: OK | llm cliente/router/prompts, INV-1 función pura, §6.4 verbatim, prompts §6.5 en prompts.py | MERGED (pase propio, 23 tests)
