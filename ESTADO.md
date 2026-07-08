@@ -13,3 +13,6 @@ T4: MERGED ab006e8 | pytest 5 passed en main
 T1: ESTRUCTURA: OK | contrato fiel 100%, hoja schemas + config→schemas; 2 fixes menores (timing dict param, aplicados por orquestador)
 T1: AUDITED | gemini 3.1 pro: CHANGES(2 menor) → resueltos
 T1: MERGED 91f3fdd | contrato base congelado; pytest verde en main
+T0.5: repo wave64 FIJADO = bsw-cuda (kernel.cu:13 __ballot_sync(0xffffffff)=W01+W02, Smith-Waterman 788 LOC, run: target); fácil = softmax-cuda (154 LOC, self-check, bonus W06); medio TBD.
+T2: ESTRUCTURA: OK | trace L1 append-only fsync (INV-4 ✓), read_events after=índice
+T2: MERGED | 11 tests verdes en main; riesgo bajo (sin panel externo, techo de calidad = orquestador)
