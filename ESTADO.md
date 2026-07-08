@@ -58,3 +58,4 @@ DEUDA fail-safe T11: restore hace chmod 0644 (pierde modo ejecutable); commit-fa
 T8: EN CURSO | state FSM+SQLite+driver (m3, watchpoint AD-3)
 T14a: EN CURSO | loop control build-fix §6.4 (deepseek-v4-pro, riesgo ALTO)
 T8: ESTRUCTURA: OK | state FSM+SqliteRunStore+driver; AD-3/INV-4/INV-5 verificados directo (watchpoint del arquitecto, pase asignado a mí) | MERGED (21 tests). Pendiente integración: swap InMemoryRunStore→SqliteRunStore en main.py al cablear pipeline completo.
+T14a: EN CURSO (deepseek, muy deliberado — estudiando taxonomy/errparse/oracle antes de escribir el control del loop; no colgado, CPU subiendo). Pendiente al aterrizar: verificación + audit (riesgo alto, candidato a codex) → luego T14b (cablear classify/fix/patcher reales) → cablear bsw verde en mock (criterio M2).
