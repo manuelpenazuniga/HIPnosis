@@ -81,3 +81,9 @@ T15b: AUDIT codex/GPT-5.5: CHANGES 3 (1 CRITICAL self_check substring→PASS fal
 T16: ESTRUCTURA: OK | report.py + templates certificado F-17 (números de código, sección NEEDS_HUMAN) | MERGED (14 tests, pase propio)
 T15c: EN CURSO | verify.py (run + paridad + timing §7) (m3)
 T17: EN CURSO | ship.py (certificado + branch/PR §8) (m3)
+T15c: MERGED (verify) | T17: MERGED (ship) | T16: MERGED (report)
+pipeline.py: integración M3 end-to-end — VERIFICADO: run completo QUEUED->DONE, verify=PASS, certificado HIPNOSIS_CERTIFICATE.md con todas las secciones. Puentea mismatch de ctx entre handlers.
+====================================================================
+🎯 HITO M3 (Día 3) CERRADO EN MOCK: verify + certificado end-to-end.
+   Un run completo sin intervención → DONE + PASS + certificado. Falta M3-real: hipcc/GPU (M0 humano).
+====================================================================
