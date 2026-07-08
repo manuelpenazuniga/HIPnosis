@@ -22,3 +22,7 @@ T5: ESTRUCTURA: OK | errparse; signature con doble clave (per-error basename ant
 T5: AUDITED gemini 3.1 pro: CHANGES → HIGH (columna opcional) resuelto + test regresión | MERGED
 T5: DEUDA diferida (validar con fixtures reales M0): números entre comillas simples; backtick de ld en signature linker
 T6: ESTRUCTURA: OK | wave64 W01-W07, stripper preserva nº línea, explicaciones fijas F-17; audit gemini en curso
+T6: ESTRUCTURA: OK | baseline fiel §5.2, stripper preserva líneas, F-17
+T6: AUDITED gemini 3.1 pro: CHANGES (precisión más allá de §5.2) → ruteado a T6b (calibración día 2)
+T6: MERGED | baseline §5.2, 28 tests verdes
+T6b: PENDIENTE | calibrar catálogo wave64 contra repos reales (bsw/softmax); insumo: .agents/audit-t6-findings.md (Gemini: mayúsculas máscara, word boundaries, long int falso pos, tiled_partition funcional, hex &0x1f). Validar SIN introducir falsos negativos.
