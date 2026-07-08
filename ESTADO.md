@@ -51,3 +51,4 @@ T12: ESTRUCTURA: OK | llm cliente/router/prompts, INV-1 función pura, §6.4 ver
 T10: ESTRUCTURA: OK | taxonomy 14 clases (E99 último), classify validado contra bsw real, tabla cuda->hip | MERGED (pase propio + validación fixture real, 28 tests)
 T13: EN CURSO | port (hipify-seam mock-aware) + buildsys (adaptación Makefile/CMake) (m3)
 T11: AUDIT codex/GPT-5.5: CHANGES — 6 bugs adversariales (2 Crit: bloque malformado ignorado, alias de path; 2 High: symlink escapa workspace, excepciones sin revert; 2 Med: CRLF fuera de bloque, re-búsqueda [0] ambigua). Panel en riesgo alto justificado (mi pase solo olió 1). → ronda de fix a deepseek. Hallazgos en .agents/audit-t11-codex-findings.md
+T13: ESTRUCTURA: OK | port hipify-seam mock-aware + buildsys (validado Makefile bsw real); deuda menor: -arch=$(VAR) forma variable (loop lo atrapa E13) | MERGED (pase propio, 46 tests)
