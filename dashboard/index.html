@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIPnosis Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; }
+    .phase-active { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+  <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <header class="mb-8">
+      <h1 class="text-4xl font-bold text-red-500 mb-2">HIPnosis</h1>
+      <p class="text-gray-400">CUDA → ROCm/AMD Port Dashboard</p>
+      <p class="text-sm text-gray-500 mt-2">Run: <span id="run-id" class="text-gray-300 font-mono"></span></p>
+    </header>
+
+    <div id="status" class="mb-6 p-4 bg-gray-800 rounded-lg text-center text-gray-400">
+      Connecting...
+    </div>
+
+    <div id="dashboard" class="space-y-8" style="display: none;">
+      <section id="timeline-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Phase Timeline</h2>
+        <div id="timeline" class="flex flex-wrap gap-2"></div>
+      </section>
+
+      <section id="errors-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Error Count (Descending)</h2>
+        <div id="errors-chart" class="space-y-2"></div>
+      </section>
+
+      <section id="efficiency-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Efficiency</h2>
+        <div id="efficiency-stats" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      </section>
+
+      <section id="wave64-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Wave64 Findings</h2>
+        <div id="wave64-table" class="overflow-x-auto"></div>
+      </section>
+
+      <section id="fixes-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Fixes Applied</h2>
+        <div id="fixes-summary" class="mb-4"></div>
+        <div id="fixes-table" class="overflow-x-auto"></div>
+      </section>
+
+      <section id="verdict-section" class="bg-gray-800 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4 text-red-400">Verification Verdict</h2>
+        <div id="verdict" class="text-center text-6xl font-bold py-8"></div>
+        <div id="verdict-detail" class="text-center text-gray-400 mt-4"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
