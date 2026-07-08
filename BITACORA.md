@@ -1,0 +1,3 @@
+# BITÁCORA — HIPnosis (registro de reflexión / checkpoints, v3 §1.2)
+
+CP-0 [2026-07-08] arranque | consulta #1 al arquitecto OK: mapa L0-L7 + INV-1..12 + AD-1..5. Plan re-estructurado: T0.5 (repos demo+manifiestos) y DEVIATIONS agregados; T14→T14a/b, T15→T15a/b/c. Hallazgo mayor: DOS caminos críticos — el de submission ejecutable (replay) es el requisito DURO del hackathon y NO depende de que el loop quede perfecto → adelantar vertical slice replay a día 1-2. M0 (droplet MI300X) fuera de esta máquina → todo en modo mock; real.py se valida por humano en M0. Routing: auditor real = "Gemini 3.1 Pro (High)" (agy no lista 3.2). Esperando OK del humano para ejecutar.
