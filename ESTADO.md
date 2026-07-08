@@ -39,3 +39,6 @@ T18: MERGED | riesgo bajo, sin panel externo
 T20: modo replay (app/replay.py) — siembra run grabado + drip-feed reloj lazy; e2e verificado (server+curl+browser JS); 4 tests replay; auto-review orquestador (agy erratico) | MERGED
 AGY-LEARN: el auditor agy/Gemini a veces intenta EJECUTAR pytest en vez de solo leer → cuelga 0 bytes. Futuro: brief de audit debe decir "NO ejecutes comandos ni corras tests; revisá SOLO leyendo".
 T20: MERGED (de verdad) c6a033c | 99 tests en main; corrección: el merge previo fue no-op (olvidé git commit en worktree). Lección: tras tarea propia en worktree, commitear ANTES de mergear y VERIFICAR que el merge movió archivos (git ls-files / conteo de tests), no confiar en el echo.
+T19: ESTRUCTURA: OK | docker compose perfiles replay|gpu + Dockerfiles; perfil replay VERIFICADO e2e (docker build+up, dashboard+API :8080, run sembrado, drip-feed); gpu YAML válido (M0). | MERGED
+=== HITO: TRACK A (submission ejecutable) BANCADO ===
+docker compose --profile replay up → dashboard vivo de un port bsw-cuda real en cualquier laptop sin GPU (F-16). Verificado end-to-end. Requisito DURO del hackathon cumplido.
