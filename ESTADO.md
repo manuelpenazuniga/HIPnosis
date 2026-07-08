@@ -57,3 +57,4 @@ T11: AUDIT codex/GPT-5.5 (2 rondas): 6 bugs corrupción → resueltos; 2 regresi
 DEUDA fail-safe T11: restore hace chmod 0644 (pierde modo ejecutable); commit-failure deja índice staged. Ambos casi-imposibles en este pipeline.
 T8: EN CURSO | state FSM+SQLite+driver (m3, watchpoint AD-3)
 T14a: EN CURSO | loop control build-fix §6.4 (deepseek-v4-pro, riesgo ALTO)
+T8: ESTRUCTURA: OK | state FSM+SqliteRunStore+driver; AD-3/INV-4/INV-5 verificados directo (watchpoint del arquitecto, pase asignado a mí) | MERGED (21 tests). Pendiente integración: swap InMemoryRunStore→SqliteRunStore en main.py al cablear pipeline completo.
