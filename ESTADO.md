@@ -16,3 +16,9 @@ T1: MERGED 91f3fdd | contrato base congelado; pytest verde en main
 T0.5: repo wave64 FIJADO = bsw-cuda (kernel.cu:13 __ballot_sync(0xffffffff)=W01+W02, Smith-Waterman 788 LOC, run: target); fácil = softmax-cuda (154 LOC, self-check, bonus W06); medio TBD.
 T2: ESTRUCTURA: OK | trace L1 append-only fsync (INV-4 ✓), read_events after=índice
 T2: MERGED | 11 tests verdes en main; riesgo bajo (sin panel externo, techo de calidad = orquestador)
+T3: ESTRUCTURA: OK | oracle base+mock, replay secuencial determinista, INV-6 paridad, sin imports prohibidos
+T3: AUDITED gemini 3.1 pro: APPROVED | MERGED
+T5: ESTRUCTURA: OK | errparse; signature con doble clave (per-error basename anti-loop F-06 / group msg-only)
+T5: AUDITED gemini 3.1 pro: CHANGES → HIGH (columna opcional) resuelto + test regresión | MERGED
+T5: DEUDA diferida (validar con fixtures reales M0): números entre comillas simples; backtick de ld en signature linker
+T6: ESTRUCTURA: OK | wave64 W01-W07, stripper preserva nº línea, explicaciones fijas F-17; audit gemini en curso
