@@ -30,7 +30,10 @@ services:
       LOCAL_LLM_MODEL: google/gemma-3-27b-it
       GPU_ARCH: gfx942
     env_file:
-      - orchestrator/.env            # secretos (FIREWORKS_API_KEY, HF_TOKEN, GITHUB_TOKEN); NO versionado
+      # secretos (FIREWORKS_API_KEY, HF_TOKEN, GITHUB_TOKEN); NO versionado.
+      # required: false → no rompe si aún no se creó el .env (se crea en M0 en el droplet).
+      - path: orchestrator/.env
+        required: false
     ports:
       - "8080:8080"
     # Acceso a la GPU AMD (KFD/DRI) para los builds hipcc y la ejecución de kernels.
