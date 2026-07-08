@@ -1,0 +1,11 @@
+hipcc -O2 --offload-arch=gfx942 -I/usr/local/cuda/include -c src/kernel.cu -o build/kernel.o
+src/kernel.cu:42:5: error: use of undeclared identifier 'cudaMemcpy'
+  cudaMemcpy(d_a, h_a, N * sizeof(float), cudaMemcpyHostToDevice);
+    ^
+src/kernel.cu:43:5: error: use of undeclared identifier 'cudaMalloc'
+  cudaMalloc(&d_a, N * sizeof(float));
+    ^
+src/kernel.cu:44:5: error: use of undeclared identifier 'cudaFree'
+  cudaFree(d_a);
+    ^
+3 errors generated.

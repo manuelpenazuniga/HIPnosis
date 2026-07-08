@@ -1,0 +1,17 @@
+hipcc -O2 --offload-arch=gfx942 -Ibroken -c app/main.cpp -o build/main.o
+src/a.cu:12:3: error: use of undeclared identifier 'warpSize'
+  int w = warpSize;
+    ^
+src/b.cu:12:3: error: use of undeclared identifier 'warpSize'
+  int w = warpSize;
+    ^
+src/c.cu:12:3: error: use of undeclared identifier 'warpSize'
+  int w = warpSize;
+    ^
+src/d.cu:12:3: error: use of undeclared identifier 'warpSize'
+  int w = warpSize;
+    ^
+src/e.cu:12:3: error: use of undeclared identifier 'warpSize'
+  int w = warpSize;
+    ^
+5 errors generated.
