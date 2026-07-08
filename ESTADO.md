@@ -55,3 +55,5 @@ T13: ESTRUCTURA: OK | port hipify-seam mock-aware + buildsys (validado Makefile 
 T11: ESTRUCTURA: OK | patcher unicidad dura + all-or-nothing (diseño arquitecto)
 T11: AUDIT codex/GPT-5.5 (2 rondas): 6 bugs corrupción → resueltos; 2 regresiones del fix → #1 (marker-in-content) fixeado por orquestador + test, #2/#6 deuda fail-safe casi-imposible (chmod-mode, índice-en-commit-fail). Panel riesgo alto JUSTIFICADO. | MERGED (35 tests)
 DEUDA fail-safe T11: restore hace chmod 0644 (pierde modo ejecutable); commit-failure deja índice staged. Ambos casi-imposibles en este pipeline.
+T8: EN CURSO | state FSM+SQLite+driver (m3, watchpoint AD-3)
+T14a: EN CURSO | loop control build-fix §6.4 (deepseek-v4-pro, riesgo ALTO)
