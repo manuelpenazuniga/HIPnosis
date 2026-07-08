@@ -50,6 +50,10 @@ class RunStore(Protocol):
     def list(self) -> list[Run]:
         ...
 
+    def put(self, run: Run) -> Run:
+        """Insert/replace a fully-formed run (used to seed a recorded replay run)."""
+        ...
+
 
 class InMemoryRunStore:
     """Trivial dict-backed implementation used until ``core.state`` lands.
@@ -79,3 +83,8 @@ class InMemoryRunStore:
 
     def list(self) -> list[Run]:
         return list(self._runs.values())
+
+    def put(self, run: Run) -> Run:
+        """Insert/replace a fully-formed run (used to seed a recorded replay run)."""
+        self._runs[run.id] = run
+        return run

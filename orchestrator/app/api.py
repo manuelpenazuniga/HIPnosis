@@ -117,6 +117,15 @@ def get_run_events(
     if store.get(run_id) is None:
         raise HTTPException(status_code=404, detail=f"run {run_id!r} not found")
 
+    # AD-4 modo replay: si hay una sesión de replay para ESTE run, servimos el
+    # trace grabado con timing acelerado (§9). El reloj revela los eventos de a
+    # poco; una carga fresca del dashboard (after == -1) reinicia la reproducción.
+    replay = getattr(request.app.state, "replay", None)
+    if replay is not None and replay.run_id == run_id:
+        visible = replay.clock.visible_count()
+        events = read_events(replay.trace_path, after=after)
+        return [e for e in events if e["_i"] < visible]
+
     return read_events(trace_path_for_run(run_id), after=after)
 
 
