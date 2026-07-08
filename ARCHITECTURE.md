@@ -48,3 +48,12 @@ INV-9: Umbrales solo en `config.py`; prompts solo en `prompts.py`. (§13.5)
 INV-10: `MAX_ITERATIONS`/`MAX_ATTEMPTS_PER_GROUP` = cotas duras; nunca reintento infinito. (§6.4, F-06)
 INV-11: El workspace nunca contiene la variante `-hip` oficial. (§7.2, anti-fuga)
 INV-12: Dirección de capas del mapa; nunca al revés; `dashboard` no importa Python.
+
+## Actualizaciones CP-1 [2026-07-08]
+AD-4 (reforzada): `replay` pagina un trace grabado en capa `api`. Se agrega `fixtures/demo-run.jsonl`
+  hand-authored (conforme §4.3, INV-8) para desacoplar el modo replay de que el loop grabe algo:
+  la submission ejecutable NO depende del loop.
+Gate de proceso (CP-1): "fixture-first" — ninguna primitiva del camino-loop mergea sin su fixture
+  consumido commiteado al lado (build_NN.txt / demo-run.jsonl). Valida oráculos sin GPU.
+Re-ruteo de modelos (CP-1): ola dura ALTO (T11 patcher, T14a/b loop, T15b paridad) → deepseek-v4-pro
+  SERIALIZADO (uno a la vez). m3 → T7/T10/T12/T16; qwen3.7-plus → T18 dashboard.
