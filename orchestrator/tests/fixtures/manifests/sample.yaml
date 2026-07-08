@@ -1,0 +1,10 @@
+build:
+  cmd: "make -f Makefile"
+  dir: "src/reduction-cuda"
+run:
+  cmd: "./main 1000000 100"
+  timeout_s: 120
+verify:
+  mode: self_check
+  pass_regex: "PASS"
+timing_regex: "Average kernel execution time.*?([\\d.]+)"
