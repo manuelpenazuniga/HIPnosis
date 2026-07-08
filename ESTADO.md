@@ -26,3 +26,5 @@ T6: ESTRUCTURA: OK | baseline fiel §5.2, stripper preserva líneas, F-17
 T6: AUDITED gemini 3.1 pro: CHANGES (precisión más allá de §5.2) → ruteado a T6b (calibración día 2)
 T6: MERGED | baseline §5.2, 28 tests verdes
 T6b: PENDIENTE | calibrar catálogo wave64 contra repos reales (bsw/softmax); insumo: .agents/audit-t6-findings.md (Gemini: mayúsculas máscara, word boundaries, long int falso pos, tiled_partition funcional, hex &0x1f). Validar SIN introducir falsos negativos.
+LANE3 (CP-1 ola1): demo-run.jsonl hand-authored (banca replay, 28 ev QUEUED->DONE, verify PASS) MERGED; golden fixtures bsw build_01-04 (gate fixture-first) MERGED; errparse revalidado contra fixtures reales OK (deuda #2/#3 no se dispara en demo repos).
+T9: EN CURSO (api, m3) | T7: EN CURSO (scan, m3)
