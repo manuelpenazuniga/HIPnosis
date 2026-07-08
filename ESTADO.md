@@ -64,3 +64,10 @@ T14a: AUDIT codex/GPT-5.5: CHANGES 5 hallazgos → #1 INV-7 counters, #2 INV-9 u
 HITO PARCIAL M2: el test green-path de T14a demuestra el loop drenando bsw 8->5->2->0 en MOCK hasta success=True → criterio mock de M2 esencialmente cumplido a nivel de loop aislado.
 FALTA para cerrar: T14b = integración (BUILD_LOOP handler real en state + propose_fix real determinista/LLM + apply_fn patcher) + swap SqliteRunStore en api + correr pipeline COMPLETO QUEUED->DONE en mock (scan->port->loop->verify-stub).
 T14b: EN CURSO | wiring real classify/fix/apply + pipeline mock completo (deepseek) — CIERRA el loop
+T14b: ESTRUCTURA: OK | build_loop wiring — integración limpia L4 (no tocó loop/state), 2 caminos de aplicación
+T14b: VERIFICADO e2e por orquestador: pipeline bsw QUEUED->DONE en mock, 8->2->0, fix E01 transformó fuente real, counters OK | MERGED (3 tests)
+====================================================================
+🎯 HITO M2 (Día 2) CERRADO EN MOCK: el loop completo corre end-to-end.
+   Pipeline QUEUED->DONE, errores drenan, fixes deterministas aplican al fuente, counters poblados.
+   Falta para M2-real: hipcc en MI300X (M0 humano, guía en docs/M0-smoke-test.md).
+====================================================================
