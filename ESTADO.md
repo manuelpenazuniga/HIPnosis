@@ -63,3 +63,4 @@ T14a: ESTRUCTURA: OK | loop control §6.4 (INV-1/4/7/9/10, F-06)
 T14a: AUDIT codex/GPT-5.5: CHANGES 5 hallazgos → #1 INV-7 counters, #2 INV-9 umbrales, #3 oscilación corregidos+tests; #4/#5 deuda menor fail-safe. codex confirmó INV-10 (sin loop infinito). | MERGED (7 tests loop)
 HITO PARCIAL M2: el test green-path de T14a demuestra el loop drenando bsw 8->5->2->0 en MOCK hasta success=True → criterio mock de M2 esencialmente cumplido a nivel de loop aislado.
 FALTA para cerrar: T14b = integración (BUILD_LOOP handler real en state + propose_fix real determinista/LLM + apply_fn patcher) + swap SqliteRunStore en api + correr pipeline COMPLETO QUEUED->DONE en mock (scan->port->loop->verify-stub).
+T14b: EN CURSO | wiring real classify/fix/apply + pipeline mock completo (deepseek) — CIERRA el loop
