@@ -135,7 +135,7 @@ class GitRepo:
             return ""
         return self._repo.head.reference.name
 
-    def is_dirty(self) -> str:
+    def is_dirty(self) -> bool:
         """True if there are staged or unstaged changes to TRACKED files.
 
         Untracked files are NOT considered dirty here — that matches the
