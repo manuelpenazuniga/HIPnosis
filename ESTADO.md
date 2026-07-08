@@ -79,3 +79,5 @@ T15a: ESTRUCTURA: OK | manifest loader §7.1, validado contra manifiestos demo s
 T15b: ESTRUCTURA: OK | parity rtol/atol F-09
 T15b: AUDIT codex/GPT-5.5: CHANGES 3 (1 CRITICAL self_check substring→PASS falso) corregidos+tests | MERGED (49 tests)
 T16: ESTRUCTURA: OK | report.py + templates certificado F-17 (números de código, sección NEEDS_HUMAN) | MERGED (14 tests, pase propio)
+T15c: EN CURSO | verify.py (run + paridad + timing §7) (m3)
+T17: EN CURSO | ship.py (certificado + branch/PR §8) (m3)
