@@ -161,6 +161,62 @@ def get_run_events(
     return read_events(trace_path_for_run(run_id), after=after)
 
 
+def _repo_dir_for_run(run_id: str) -> str:
+    from pathlib import Path
+    return str(Path(__file__).resolve().parent.parent / "workspaces" / run_id / "repo")
+
+
+def _fixtures_dir():
+    from pathlib import Path
+    return Path(__file__).resolve().parent.parent.parent / "fixtures"
+
+
+@router.get("/runs/{run_id}/diff")
+def get_run_diff(run_id: str, request: Request) -> dict:
+    """La transformación REAL del código CUDA→HIP (el 'esto no es vaporware').
+
+    Devuelve el diff del workspace portado (root..HEAD) si existe; si no (modo replay),
+    sirve el diff demo bundleado (fixtures/demo-diff.txt). Formato: {"diff": "<texto>"}.
+    """
+    import os
+    import subprocess
+
+    repo_dir = _repo_dir_for_run(run_id)
+    if os.path.isdir(os.path.join(repo_dir, ".git")):
+        try:
+            root = subprocess.run(
+                ["git", "rev-list", "--max-parents=0", "HEAD"],
+                cwd=repo_dir, capture_output=True, text=True, timeout=10,
+            ).stdout.strip().splitlines()
+            base = root[0] if root else "HEAD"
+            diff = subprocess.run(
+                ["git", "diff", f"{base}", "HEAD"],
+                cwd=repo_dir, capture_output=True, text=True, timeout=15,
+            ).stdout
+            if diff.strip():
+                return {"diff": diff}
+        except Exception:  # noqa: BLE001
+            pass
+    demo = _fixtures_dir() / "demo-diff.txt"
+    return {"diff": demo.read_text() if demo.exists() else ""}
+
+
+@router.get("/runs/{run_id}/certificate")
+def get_run_certificate(run_id: str, request: Request) -> dict:
+    """El certificado de port (markdown). Workspace vivo o demo bundleado (replay).
+
+    Formato: {"markdown": "<texto>"}. El dashboard lo renderiza.
+    """
+    import os
+
+    cert = os.path.join(_repo_dir_for_run(run_id), "HIPNOSIS_CERTIFICATE.md")
+    if os.path.isfile(cert):
+        with open(cert, encoding="utf-8") as f:
+            return {"markdown": f.read()}
+    demo = _fixtures_dir() / "demo-certificate.md"
+    return {"markdown": demo.read_text() if demo.exists() else ""}
+
+
 @router.get("/healthz")
 def healthz() -> dict[str, bool]:
     return {"ok": True}

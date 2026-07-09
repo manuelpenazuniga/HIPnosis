@@ -182,3 +182,16 @@ def test_post_runs_does_not_execute_pipeline(
             assert ".oracle" not in module and not module.endswith("oracle"), (
                 f"{mod.__name__}.{name} pulls in oracle"
             )
+
+
+def test_diff_and_certificate_endpoints_serve_demo_fallback():
+    """Sin workspace (modo replay), /diff y /certificate sirven el demo bundleado."""
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    c = TestClient(create_app(autorun=False))
+    d = c.get("/runs/anyrun/diff")
+    assert d.status_code == 200 and "diff" in d.json()
+    assert "hipMalloc" in d.json()["diff"] or "hip_runtime" in d.json()["diff"]
+    cert = c.get("/runs/anyrun/certificate")
+    assert cert.status_code == 200 and "markdown" in cert.json()
+    assert "PASS" in cert.json()["markdown"]

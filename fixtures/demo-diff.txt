@@ -1,0 +1,65 @@
+diff --git a/kernel.cu b/kernel.cu
+index 3f8a1c2..b7e9d04 100644
+--- a/kernel.cu
++++ b/kernel.cu
+@@ -1,6 +1,6 @@
+-#include <cuda_runtime.h>
++#include <hip/hip_runtime.h>
+ #include "bsw_kernel.h"
+
+ // Smith-Waterman local alignment kernel (protein)
+@@ -10,8 +10,8 @@ __global__ void sw_align(const char* seqA, const char* seqB,
+   short myMax = 0;
+   short myIndex = 0;
+
+-  // WAVE64 W01/W02: máscara de 32 bits — en MI300X el wavefront es de 64 lanes
+-  unsigned mask = __ballot_sync(0xffffffff, threadIdx.x < lengthSeqB);
++  // HIPnosis fix(E05): wavefront de 64 lanes en CDNA3 — máscara y resultado de 64 bits
++  unsigned long long mask = __ballot_sync(0xffffffffffffffffULL, threadIdx.x < lengthSeqB);
+
+   for (int diag = 0; diag < nDiags; ++diag) {
+@@ -51,10 +51,11 @@ __device__ short blockShuffleReduce(short myVal, short& myIndex) {
+-  int laneId = threadIdx.x % 32;
+-  int warpId = threadIdx.x / 32;
++  // HIPnosis fix(E05): warpSize en runtime (64 en MI300X), no fijo en 32
++  int laneId = threadIdx.x % warpSize;
++  int warpId = threadIdx.x / warpSize;
+
+   for (int offset = warpSize / 2; offset > 0; offset >>= 1) {
+-    short otherVal = __shfl_sync(mask, myVal, laneId - offset, 32);
++    short otherVal = __shfl_sync(mask, myVal, laneId - offset, warpSize);
+     if (otherVal > myVal) { myVal = otherVal; }
+   }
+diff --git a/main.cu b/main.cu
+index a1c4f89..e2b7c31 100644
+--- a/main.cu
++++ b/main.cu
+@@ -1,5 +1,5 @@
+-#include <cuda_runtime.h>
++#include <hip/hip_runtime.h>
+ #include <cstdio>
+ #include "bsw_kernel.h"
+
+@@ -40,9 +40,9 @@ int main(int argc, char** argv) {
+   char *d_seqA, *d_seqB;
+-  cudaMalloc(&d_seqA, bytesA);
+-  cudaMalloc(&d_seqB, bytesB);
+-  cudaMemcpy(d_seqA, h_seqA, bytesA, cudaMemcpyHostToDevice);
++  hipMalloc(&d_seqA, bytesA);
++  hipMalloc(&d_seqB, bytesB);
++  hipMemcpy(d_seqA, h_seqA, bytesA, hipMemcpyHostToDevice);
+
+   sw_align<<<grid, block>>>(d_seqA, d_seqB, d_scores, nSeqs);
+-  cudaDeviceSynchronize();
++  hipDeviceSynchronize();
+diff --git a/Makefile b/Makefile
+index 77b0e12..c3a9f45 100644
+--- a/Makefile
++++ b/Makefile
+@@ -3,8 +3,8 @@
+-CC        = nvcc
+-ARCH      = sm_60
++CC        = hipcc
++ARCH      = gfx942
+-CFLAGS := -std=c++17 -Xcompiler -Wall -arch=$(ARCH)
++CFLAGS := -std=c++17 -Wall --offload-arch=$(ARCH)
