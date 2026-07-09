@@ -1,0 +1,8 @@
+hipcc -O3 --offload-arch=gfx942 -c main.cu -o main.o
+main.cu:88:3: error: use of undeclared identifier 'cudaMalloc'
+main.cu:89:3: error: use of undeclared identifier 'cudaMalloc'
+main.cu:95:3: error: use of undeclared identifier 'cudaMemcpy'
+main.cu:96:3: error: use of undeclared identifier 'cudaMemcpy'
+main.cu:120:3: error: use of undeclared identifier 'cudaMemcpy'
+main.cu:60:24: error: unknown type name 'cudaDeviceProp'
+6 errors generated when compiling for gfx942.

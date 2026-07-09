@@ -1,0 +1,2 @@
+Average execution time: 3.42 (ms)
+PASS

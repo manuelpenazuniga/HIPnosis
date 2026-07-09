@@ -1,0 +1,7 @@
+# Manifiesto demo scan-cuda (§7.1). Repo MEDIO: prefix-sum paralelo, varias API CUDA (3-8 fixes de loop).
+build: { cmd: "make -f Makefile", dir: "." }
+run:   { cmd: "./main 268435456 100", timeout_s: 180 }
+verify:
+  mode: self_check          # main.cu:19 printf error?"FAIL":"PASS"
+  pass_regex: "PASS"
+timing_regex: "Average .*?([0-9.]+)"

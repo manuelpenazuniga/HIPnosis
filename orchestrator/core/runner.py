@@ -85,7 +85,7 @@ def _resolve_manifest(repo_url: str, oracle_mode: str) -> Manifest:
             verify=VerifySpec(mode="self_check", pass_regex="PASS"),
         )
     lower = repo_url.lower()
-    for key in ("bsw", "softmax"):
+    for key in ("bsw", "softmax", "scan"):
         if key in lower:
             path = _FIXTURES / "manifests" / f"{key}.yaml"
             if path.exists():
@@ -98,7 +98,7 @@ def _resolve_manifest(repo_url: str, oracle_mode: str) -> Manifest:
     )
 
 
-def _make_oracle(config: Config, repo_dir: str, manifest: Manifest) -> Oracle:
+def _make_oracle(config: Config, repo_dir: str, repo_url: str, manifest: Manifest) -> Oracle:
     """Fabrica el oráculo según el modo (INV-6, mismo contrato)."""
     if config.oracle_mode == "real":
         from core.oracle.real import RealOracle
@@ -107,9 +107,16 @@ def _make_oracle(config: Config, repo_dir: str, manifest: Manifest) -> Oracle:
             build_cmd=manifest.build.cmd,
             build_dir=manifest.build.dir,
         )
-    # mock (y replay no llega acá — replay lo sirve la api sin ejecutar pipeline, AD-4):
-    # usamos las fixtures de bsw como secuencia de builds (8->0) para la demo hermética.
-    return MockOracle(str(_FIXTURES / "bsw"))
+    # mock: cada repo demo usa SU secuencia de builds (repo→fixtures). Default bsw.
+    return MockOracle(str(_FIXTURES / _fixtures_key(repo_url)))
+
+
+def _fixtures_key(repo_url_or_dir: str) -> str:
+    lower = repo_url_or_dir.lower()
+    for key in ("bsw", "softmax", "scan"):
+        if key in lower:
+            return key
+    return "bsw"
 
 
 def execute_run(run_id: str, store: SqliteRunStore, config: Config) -> Run:
@@ -134,6 +141,6 @@ def execute_run(run_id: str, store: SqliteRunStore, config: Config) -> Run:
         _stage_mock_workspace(repo_dir)
 
     manifest = _resolve_manifest(run.repo_url, config.oracle_mode)
-    oracle = _make_oracle(config, repo_dir, manifest)
+    oracle = _make_oracle(config, repo_dir, run.repo_url, manifest)
 
     return run_full_pipeline(run_id, store, config, trace, oracle, manifest, repo_dir)

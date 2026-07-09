@@ -1,0 +1,2 @@
+Softmax kernel time: 0.85 ms
+PASS

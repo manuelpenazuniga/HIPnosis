@@ -1,0 +1,3 @@
+hipcc -O3 --offload-arch=gfx942 -c main.cu -o main.o
+hipcc -O3 --offload-arch=gfx942 main.o -o main
+Build succeeded.
