@@ -96,3 +96,12 @@ pipeline.py: integración M3 end-to-end — VERIFICADO: run completo QUEUED->DON
 ====================================================================
 PENDIENTE (menor/no-bloqueante): unificar contrato de ctx entre handlers; M0 humano (real.py con GPU);
 M5 README/video. El backend está funcionalmente completo en mock.
+====================================================================
+🎨 PULIDO PARA GANAR (dashboard wow + 3 repos + narrativa):
+- 3 repos demo verdes en mock: bsw (wave64, 8→0), softmax (fácil, 3→0), scan (medio, 10→3→0).
+  runner mapea repo→fixtures+manifiesto; cada POST /runs corre su secuencia.
+- Backend: endpoints /diff (transformación real CUDA→HIP) y /certificate + demo bundleado; precios demo.
+- Dashboard REDISEÑADO (wow): hero 4 métricas (errores, %local Gemma, $0 API, wave64 cazados) + sparkline,
+  wave64 panel héroe, sección diff (highlight.js), burndown, barras tokens local/remoto, certificado (marked.js).
+  Verificado funcional (sintaxis JS, IDs, métricas, sirve en replay). Browser extension caído → sin screenshot.
+====================================================================
