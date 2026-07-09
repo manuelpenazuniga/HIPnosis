@@ -1,9 +1,26 @@
-const PHASES = ['QUEUED', 'CLONING', 'SCANNING', 'PORTING', 'BUILD_LOOP', 'RUNNING', 'PARITY', 'REPORTING', 'DONE'];
-const PHASE_COLORS = {
-  QUEUED: 'bg-gray-600', CLONING: 'bg-blue-600', SCANNING: 'bg-cyan-600',
-  PORTING: 'bg-purple-600', BUILD_LOOP: 'bg-yellow-600', RUNNING: 'bg-orange-600',
-  PARITY: 'bg-green-600', REPORTING: 'bg-indigo-600', DONE: 'bg-red-600',
-  DONE_PARTIAL: 'bg-red-500', FAILED: 'bg-red-800'
+const PHASES = ['QUEUED','CLONING','SCANNING','PORTING','BUILD_LOOP','RUNNING','PARITY','REPORTING','DONE'];
+const PHASE_META = {
+  QUEUED:       { label: 'Queued',      icon: '◎' },
+  CLONING:      { label: 'Cloning',     icon: '⬇' },
+  SCANNING:     { label: 'Scanning',    icon: '⊙' },
+  PORTING:      { label: 'Porting',     icon: '⇄' },
+  BUILD_LOOP:   { label: 'Build Loop',  icon: '⟳' },
+  RUNNING:      { label: 'Running',     icon: '▶' },
+  PARITY:       { label: 'Parity',      icon: '≡' },
+  REPORTING:    { label: 'Reporting',   icon: '◉' },
+  DONE:         { label: 'Done',        icon: '✓' },
+  DONE_PARTIAL: { label: 'Partial',     icon: '◐' },
+  FAILED:       { label: 'Failed',      icon: '✕' },
+};
+
+const WAVE64_SEV = {
+  W01: { label: 'Correctness', color: 'red' },
+  W02: { label: 'Correctness', color: 'red' },
+  W03: { label: 'Correctness', color: 'red' },
+  W04: { label: 'Suspicious',  color: 'amber' },
+  W05: { label: 'Suspicious',  color: 'amber' },
+  W06: { label: 'Suspicious',  color: 'amber' },
+  W07: { label: 'Suspicious',  color: 'amber' },
 };
 
 const state = {
@@ -18,220 +35,344 @@ const state = {
   verify: null,
   report: null,
   scan: null,
+  runMeta: null,
   polling: true,
-  demoMode: false
+  demoMode: false,
+  diffFetched: false,
+  certFetched: false,
+  certRaw: '',
 };
 
 function getRunId() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('run') || 'run_bsw01a2';
+  return new URLSearchParams(window.location.search).get('run') || 'run_bsw01a2';
 }
 
-function setStatus(msg, isError = false) {
-  const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = `mb-6 p-4 rounded-lg text-center ${isError ? 'bg-red-900 text-red-200' : 'bg-gray-800 text-gray-400'}`;
+function $(id) { return document.getElementById(id); }
+
+function showApp() {
+  $('loading-screen').classList.add('hidden');
+  $('app').classList.remove('hidden');
 }
 
-function showDashboard() {
-  document.getElementById('status').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
+function revealSection(id) {
+  const el = $(id);
+  if (el && !el.classList.contains('visible')) {
+    el.classList.add('visible');
+  }
+}
+
+function updateStatusBadge(phase) {
+  const badge = $('status-badge');
+  if (!phase) return;
+  const map = {
+    DONE:         { cls: 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30', label: 'DONE' },
+    DONE_PARTIAL: { cls: 'bg-amber-500/15 text-amber-400 border border-amber-500/30', label: 'DONE (PARTIAL)' },
+    FAILED:       { cls: 'bg-red-500/15 text-red-400 border border-red-500/30', label: 'FAILED' },
+    REPORTING:    { cls: 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30', label: 'REPORTING' },
+    PARITY:       { cls: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30', label: 'PARITY' },
+    RUNNING:      { cls: 'bg-orange-500/15 text-orange-400 border border-orange-500/30', label: 'RUNNING' },
+    BUILD_LOOP:   { cls: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 pulse-active', label: 'BUILD LOOP' },
+    PORTING:      { cls: 'bg-purple-500/15 text-purple-400 border border-purple-500/30 pulse-active', label: 'PORTING' },
+    SCANNING:     { cls: 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 pulse-active', label: 'SCANNING' },
+    CLONING:      { cls: 'bg-blue-500/15 text-blue-400 border border-blue-500/30 pulse-active', label: 'CLONING' },
+    QUEUED:       { cls: 'bg-gray-500/15 text-gray-400 border border-gray-500/30', label: 'QUEUED' },
+  };
+  const m = map[phase] || map.QUEUED;
+  badge.className = `px-4 py-2 rounded-full text-sm font-bold ${m.cls}`;
+  badge.textContent = m.label;
 }
 
 function renderTimeline() {
-  const container = document.getElementById('timeline');
+  const container = $('timeline');
   container.innerHTML = '';
-  const allPhases = [...PHASES, 'DONE_PARTIAL', 'FAILED'];
-  const displayPhases = state.currentPhase === 'FAILED' ? [...PHASES, 'FAILED'] :
-                        state.currentPhase === 'DONE_PARTIAL' ? [...PHASES, 'DONE_PARTIAL'] : PHASES;
+  const displayPhases = (state.currentPhase === 'FAILED' || state.currentPhase === 'DONE_PARTIAL')
+    ? [...PHASES, state.currentPhase] : PHASES;
 
-  displayPhases.forEach(phase => {
-    const el = document.createElement('div');
+  displayPhases.forEach((phase, i) => {
+    const meta = PHASE_META[phase] || { label: phase, icon: '·' };
     const isActive = phase === state.currentPhase;
     const isPast = PHASES.indexOf(phase) < PHASES.indexOf(state.currentPhase) ||
                    (state.currentPhase === 'DONE' && phase !== 'FAILED' && phase !== 'DONE_PARTIAL');
-    const color = PHASE_COLORS[phase] || 'bg-gray-600';
+    const isTerminalFail = phase === 'FAILED';
+    const isTerminalPartial = phase === 'DONE_PARTIAL';
 
-    el.className = `px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-      isActive ? `${color} phase-active text-white ring-2 ring-white` :
-      isPast ? `${color} text-white opacity-70` :
-      'bg-gray-700 text-gray-500'
-    }`;
-    el.textContent = phase;
-    container.appendChild(el);
-  });
-}
-
-function renderErrors() {
-  const container = document.getElementById('errors-chart');
-  container.innerHTML = '';
-  if (state.builds.length === 0) return;
-
-  const maxErrors = Math.max(...state.builds.map(b => b.errors), 1);
-
-  state.builds.forEach(build => {
-    const row = document.createElement('div');
-    row.className = 'flex items-center gap-4';
-
-    const label = document.createElement('div');
-    label.className = 'w-24 text-sm text-gray-400 font-mono';
-    label.textContent = `Iter ${build.iteration}`;
-
-    const barContainer = document.createElement('div');
-    barContainer.className = 'flex-1 bg-gray-700 rounded-full h-8 relative';
-
-    const bar = document.createElement('div');
-    const pct = (build.errors / maxErrors) * 100;
-    bar.className = `h-full rounded-full transition-all duration-500 ${
-      build.errors === 0 ? 'bg-green-500' : 'bg-red-500'
-    }`;
-    bar.style.width = `${pct}%`;
-
-    const count = document.createElement('span');
-    count.className = 'absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-white';
-    count.textContent = build.errors;
-
-    barContainer.appendChild(bar);
-    barContainer.appendChild(count);
-    row.appendChild(label);
-    row.appendChild(barContainer);
-    container.appendChild(row);
-  });
-}
-
-function renderEfficiency() {
-  const container = document.getElementById('efficiency-stats');
-  container.innerHTML = '';
-  if (!state.report) return;
-
-  const totalFixes = state.report.fixes_deterministic + state.report.fixes_local + state.report.fixes_remote;
-  const localFixes = state.report.fixes_deterministic + state.report.fixes_local;
-  const pctLocal = totalFixes > 0 ? Math.round((localFixes / totalFixes) * 100) : 0;
-
-  const cards = [
-    { label: '% Resolved Locally', value: `${pctLocal}%`, color: 'text-green-400' },
-    { label: 'Tokens (Local)', value: state.report.tokens_local.toLocaleString(), color: 'text-cyan-400' },
-    { label: 'Tokens (Remote)', value: state.report.tokens_remote.toLocaleString(), color: 'text-purple-400' }
-  ];
-
-  cards.forEach(card => {
     const el = document.createElement('div');
-    el.className = 'bg-gray-700 rounded-lg p-6 text-center';
-    el.innerHTML = `
-      <div class="text-sm text-gray-400 mb-2">${card.label}</div>
-      <div class="text-4xl font-bold ${card.color}">${card.value}</div>
-    `;
+    let cls = 'px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ';
+    if (isActive) {
+      if (isTerminalFail) cls += 'bg-red-500/20 text-red-400 border border-red-500/40 pulse-active';
+      else if (isTerminalPartial) cls += 'bg-amber-500/20 text-amber-400 border border-amber-500/40 pulse-active';
+      else cls += 'bg-blue-500/20 text-blue-400 border border-blue-500/40 pulse-active';
+    } else if (isPast) {
+      cls += 'bg-emerald-500/10 text-emerald-500/70 border border-emerald-500/10';
+    } else {
+      cls += 'bg-surface-700 text-gray-600 border border-transparent';
+    }
+    el.className = cls;
+    el.innerHTML = `<span class="text-sm">${meta.icon}</span><span>${meta.label}</span>`;
     container.appendChild(el);
   });
+  revealSection('timeline-section');
+}
+
+function renderHeroMetrics() {
+  const r = state.report;
+  const initialErrors = r ? r.errors_initial : (state.builds.length ? state.builds[0].errors : null);
+  const currentErrors = state.builds.length ? state.builds[state.builds.length - 1].errors : null;
+
+  if (initialErrors !== null && currentErrors !== null) {
+    $('metric-errors').textContent = initialErrors;
+    $('metric-errors-sub').textContent = `→ ${currentErrors}`;
+    renderSparkline();
+  }
+
+  if (r) {
+    const totalFixes = r.fixes_deterministic + r.fixes_local + r.fixes_remote;
+    const localFixes = r.fixes_deterministic + r.fixes_local;
+    const pct = totalFixes > 0 ? Math.round((localFixes / totalFixes) * 100) : 0;
+    $('metric-local').textContent = pct;
+
+    const costEstimate = (r.tokens_remote * 0.000003).toFixed(2);
+    $('metric-cost').textContent = `$${costEstimate}`;
+
+    $('metric-wave64').textContent = r.wave64_findings || state.wave64.length;
+  } else {
+    $('metric-wave64').textContent = state.wave64.length;
+  }
+}
+
+function renderSparkline() {
+  if (state.builds.length < 2) return;
+  const svg = $('sparkline-errors');
+  const errors = state.builds.map(b => b.errors);
+  const max = Math.max(...errors, 1);
+  const w = 64, h = 32, pad = 2;
+  const step = (w - pad * 2) / Math.max(errors.length - 1, 1);
+  const points = errors.map((e, i) => {
+    const x = pad + i * step;
+    const y = h - pad - (e / max) * (h - pad * 2);
+    return `${x},${y}`;
+  });
+  svg.innerHTML = `
+    <polyline points="${points.join(' ')}" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sparkline-path" opacity="0.8"/>
+    <circle cx="${points[points.length-1].split(',')[0]}" cy="${points[points.length-1].split(',')[1]}" r="2.5" fill="#22c55e"/>
+  `;
 }
 
 function renderWave64() {
-  const container = document.getElementById('wave64-table');
-  container.innerHTML = '';
-  if (state.wave64.length === 0) return;
-
-  const table = document.createElement('table');
-  table.className = 'w-full text-left';
-  table.innerHTML = `
-    <thead class="border-b border-gray-600">
-      <tr>
-        <th class="py-2 px-4 text-gray-400">File</th>
-        <th class="py-2 px-4 text-gray-400">Line</th>
-        <th class="py-2 px-4 text-gray-400">Pattern</th>
-      </tr>
-    </thead>
-  `;
-
-  const tbody = document.createElement('tbody');
+  const container = $('wave64-table');
+  if (state.wave64.length === 0) {
+    container.innerHTML = '<p class="text-gray-600 text-sm py-4">No wave64 findings.</p>';
+    return;
+  }
+  let html = `<table class="w-full text-left text-sm">
+    <thead><tr class="border-b border-white/5">
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">File</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Line</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Pattern</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Severity</th>
+    </tr></thead><tbody>`;
   state.wave64.forEach(w => {
-    const row = document.createElement('tr');
-    row.className = 'border-b border-gray-700';
-    row.innerHTML = `
-      <td class="py-2 px-4 font-mono text-sm">${w.file}</td>
-      <td class="py-2 px-4 font-mono text-sm">${w.line}</td>
-      <td class="py-2 px-4"><span class="bg-yellow-600 text-white px-2 py-1 rounded text-xs font-bold">${w.pattern}</span></td>
-    `;
-    tbody.appendChild(row);
+    const sev = WAVE64_SEV[w.pattern] || { label: 'Info', color: 'gray' };
+    const sevCls = sev.color === 'red' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                   sev.color === 'amber' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                   'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    const patCls = 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
+    html += `<tr class="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+      <td class="py-2.5 px-3 font-mono text-gray-300">${w.file}</td>
+      <td class="py-2.5 px-3 font-mono text-gray-400">${w.line}</td>
+      <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-bold border ${patCls}">${w.pattern}</span></td>
+      <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-semibold border ${sevCls}">${sev.label}</span></td>
+    </tr>`;
   });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+  revealSection('wave64-section');
+}
 
-  table.appendChild(tbody);
-  container.appendChild(table);
+function renderDiff(text) {
+  const container = $('diff-container');
+  if (!text) {
+    container.innerHTML = '<p class="text-gray-600 text-center py-8">No diff available.</p>';
+    return;
+  }
+  const lines = text.split('\n');
+  let html = '';
+  lines.forEach(line => {
+    let cls = 'diff-line';
+    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('diff ') || line.startsWith('index ')) {
+      cls += ' diff-meta';
+    } else if (line.startsWith('@@')) {
+      cls += ' diff-hunk';
+    } else if (line.startsWith('+')) {
+      cls += ' diff-add';
+    } else if (line.startsWith('-')) {
+      cls += ' diff-del';
+    } else {
+      cls += ' text-gray-500';
+    }
+    html += `<div class="${cls}">${escapeHtml(line)}</div>`;
+  });
+  container.innerHTML = html;
+  revealSection('diff-section');
+}
+
+function renderBurndown() {
+  const container = $('burndown-chart');
+  if (state.builds.length === 0) return;
+  const maxErrors = Math.max(...state.builds.map(b => b.errors), 1);
+  let html = '';
+  state.builds.forEach((b, i) => {
+    const pct = (b.errors / maxErrors) * 100;
+    const isZero = b.errors === 0;
+    const barColor = isZero ? 'bg-emerald-500' : 'bg-gradient-to-r from-amd to-red-400';
+    const delay = i * 100;
+    html += `<div class="flex items-center gap-4 group">
+      <div class="w-16 text-xs font-mono text-gray-500 text-right flex-shrink-0">iter ${b.iteration}</div>
+      <div class="flex-1 h-8 bg-surface-600 rounded-lg relative overflow-hidden">
+        <div class="${barColor} h-full rounded-lg bar-animate transition-all duration-500" style="width:${Math.max(pct, 2)}%; animation-delay:${delay}ms"></div>
+        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isZero ? 'text-emerald-400' : 'text-white'}">${b.errors}</span>
+      </div>
+      <div class="w-12 text-xs font-mono text-gray-600 flex-shrink-0">${b.delta > 0 ? '+' : ''}${b.delta}</div>
+    </div>`;
+  });
+  container.innerHTML = html;
+  revealSection('burndown-section');
 }
 
 function renderFixes() {
-  const summaryEl = document.getElementById('fixes-summary');
-  const tableEl = document.getElementById('fixes-table');
-  summaryEl.innerHTML = '';
-  tableEl.innerHTML = '';
+  const tableEl = $('fixes-table');
+  const countersEl = $('fixes-counters');
+  const tokensBar = $('fixes-tokens-bar');
 
   if (state.fixes.length === 0) return;
 
   const counts = { deterministic: 0, local: 0, remote: 0 };
   state.fixes.forEach(f => { counts[f.tier] = (counts[f.tier] || 0) + 1; });
 
-  summaryEl.innerHTML = `
-    <div class="flex gap-4 text-sm">
-      <span class="bg-green-700 px-3 py-1 rounded">Deterministic: ${counts.deterministic}</span>
-      <span class="bg-cyan-700 px-3 py-1 rounded">Local: ${counts.local}</span>
-      <span class="bg-purple-700 px-3 py-1 rounded">Remote: ${counts.remote}</span>
-    </div>
+  const tierBadge = (tier) => {
+    const map = {
+      deterministic: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+      local:         'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      remote:        'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    };
+    return `<span class="px-2 py-0.5 rounded-md text-xs font-semibold border ${map[tier] || map.deterministic}">${tier}</span>`;
+  };
+
+  countersEl.innerHTML = `
+    <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-gray-500/10 text-gray-400 border border-gray-500/20">Deterministic: ${counts.deterministic}</span>
+    <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Local: ${counts.local}</span>
+    <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">Remote: ${counts.remote}</span>
   `;
 
-  const table = document.createElement('table');
-  table.className = 'w-full text-left';
-  table.innerHTML = `
-    <thead class="border-b border-gray-600">
-      <tr>
-        <th class="py-2 px-4 text-gray-400">Class</th>
-        <th class="py-2 px-4 text-gray-400">Tier</th>
-        <th class="py-2 px-4 text-gray-400">Commit</th>
-        <th class="py-2 px-4 text-gray-400">Delta</th>
-      </tr>
-    </thead>
-  `;
+  if (state.report) {
+    tokensBar.classList.remove('hidden');
+    const total = state.report.tokens_local + state.report.tokens_remote || 1;
+    const localPct = (state.report.tokens_local / total) * 100;
+    const remotePct = (state.report.tokens_remote / total) * 100;
+    $('tokens-local-bar').style.width = `${localPct}%`;
+    $('tokens-remote-bar').style.width = `${remotePct}%`;
+  }
 
-  const tbody = document.createElement('tbody');
+  let html = `<table class="w-full text-left text-sm">
+    <thead><tr class="border-b border-white/5">
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tier</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Commit</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Delta</th>
+    </tr></thead><tbody>`;
   state.fixes.forEach(f => {
     const klass = state.classifies[f.sig]?.klass || '?';
-    const tierColor = f.tier === 'deterministic' ? 'bg-green-700' :
-                      f.tier === 'local' ? 'bg-cyan-700' : 'bg-purple-700';
-    const row = document.createElement('tr');
-    row.className = 'border-b border-gray-700';
-    row.innerHTML = `
-      <td class="py-2 px-4 font-mono text-sm">${klass}</td>
-      <td class="py-2 px-4"><span class="${tierColor} text-white px-2 py-1 rounded text-xs">${f.tier}</span></td>
-      <td class="py-2 px-4 font-mono text-xs text-gray-400">${f.commit || '-'}</td>
-      <td class="py-2 px-4 font-mono text-sm ${f.delta < 0 ? 'text-green-400' : 'text-red-400'}">${f.delta}</td>
-    `;
-    tbody.appendChild(row);
+    const commitShort = f.commit ? f.commit.substring(0, 7) : '—';
+    const deltaColor = f.delta <= 0 ? 'text-emerald-400' : 'text-red-400';
+    html += `<tr class="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+      <td class="py-2.5 px-3 font-mono text-gray-300">${klass}</td>
+      <td class="py-2.5 px-3">${tierBadge(f.tier)}</td>
+      <td class="py-2.5 px-3 font-mono text-xs text-gray-500">${commitShort}</td>
+      <td class="py-2.5 px-3 font-mono text-xs text-right ${deltaColor}">${f.delta > 0 ? '+' : ''}${f.delta}</td>
+    </tr>`;
   });
-
-  table.appendChild(tbody);
-  tableEl.appendChild(table);
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
+  revealSection('fixes-section');
 }
 
 function renderVerdict() {
-  const verdictEl = document.getElementById('verdict');
-  const detailEl = document.getElementById('verdict-detail');
+  const el = $('verdict');
+  const detail = $('verdict-detail');
+  if (!state.verify) return;
 
-  if (!state.verify) {
-    verdictEl.textContent = '...';
-    verdictEl.className = 'text-center text-6xl font-bold py-8 text-gray-600';
-    detailEl.textContent = '';
-    return;
+  const map = {
+    PASS:       { cls: 'text-emerald-400', glow: 'drop-shadow(0 0 30px rgba(34,197,94,0.3))' },
+    FAIL:       { cls: 'text-red-400', glow: 'drop-shadow(0 0 30px rgba(239,68,68,0.3))' },
+    NO_ORACLE:  { cls: 'text-amber-400', glow: 'drop-shadow(0 0 30px rgba(245,158,11,0.3))' },
+  };
+  const m = map[state.verify.verdict] || map.NO_ORACLE;
+  el.className = `text-7xl sm:text-8xl font-black py-4 ${m.cls}`;
+  el.style.filter = m.glow;
+  el.textContent = state.verify.verdict;
+  detail.textContent = state.verify.detail || '';
+  revealSection('verdict-section');
+}
+
+function renderCertificate(md) {
+  if (!md) return;
+  state.certRaw = md;
+  const content = $('cert-content');
+  const toggle = $('cert-toggle');
+  const downloadBtn = $('cert-download-btn');
+
+  try {
+    content.innerHTML = marked.parse(md);
+  } catch (e) {
+    content.innerHTML = `<pre class="text-sm text-gray-400 whitespace-pre-wrap">${escapeHtml(md)}</pre>`;
   }
 
-  const colors = { PASS: 'text-green-400', FAIL: 'text-red-400', NO_ORACLE: 'text-yellow-400' };
-  verdictEl.textContent = state.verify.verdict;
-  verdictEl.className = `text-center text-6xl font-bold py-8 ${colors[state.verify.verdict] || 'text-gray-400'}`;
-  detailEl.textContent = state.verify.detail || '';
+  toggle.classList.remove('hidden');
+  downloadBtn.classList.remove('hidden');
+  revealSection('certificate-section');
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function fetchDiff() {
+  if (state.diffFetched) return;
+  state.diffFetched = true;
+  try {
+    const resp = await fetch(`/runs/${state.runId}/diff`);
+    if (resp.ok) {
+      const data = await resp.json();
+      renderDiff(data.diff || '');
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function fetchCertificate() {
+  if (state.certFetched) return;
+  state.certFetched = true;
+  try {
+    const resp = await fetch(`/runs/${state.runId}/certificate`);
+    if (resp.ok) {
+      const data = await resp.json();
+      renderCertificate(data.markdown || '');
+    }
+  } catch (e) { /* silent */ }
 }
 
 function processEvent(ev) {
   switch (ev.ev) {
     case 'phase':
       state.currentPhase = ev.phase;
+      updateStatusBadge(ev.phase);
       renderTimeline();
+      if (ev.phase === 'REPORTING' || ev.phase === 'DONE' || ev.phase === 'DONE_PARTIAL') {
+        fetchDiff();
+        fetchCertificate();
+      }
+      break;
+    case 'run_meta':
+      state.runMeta = ev;
       break;
     case 'scan':
       state.scan = ev;
@@ -239,10 +380,12 @@ function processEvent(ev) {
     case 'wave64':
       state.wave64.push({ file: ev.file, line: ev.line, pattern: ev.pattern });
       renderWave64();
+      renderHeroMetrics();
       break;
     case 'build':
       state.builds.push({ iteration: ev.iteration, errors: ev.errors, delta: ev.delta });
-      renderErrors();
+      renderBurndown();
+      renderHeroMetrics();
       break;
     case 'classify':
       state.classifies[ev.sig] = { klass: ev.klass, tier: ev.tier, confidence: ev.confidence };
@@ -257,7 +400,8 @@ function processEvent(ev) {
       break;
     case 'report':
       state.report = ev;
-      renderEfficiency();
+      renderHeroMetrics();
+      renderFixes();
       break;
     default:
       break;
@@ -276,30 +420,26 @@ function processEvents(events) {
 
 async function pollEvents() {
   if (!state.polling) return;
-
   try {
     const url = `/runs/${state.runId}/events?after=${state.lastIdx}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const events = await resp.json();
-
     if (events.length > 0) {
       processEvents(events);
-      showDashboard();
-      setStatus('');
+      showApp();
     }
-
-    if (state.currentPhase === 'DONE' || state.currentPhase === 'FAILED' || state.currentPhase === 'DONE_PARTIAL') {
+    if (['DONE','FAILED','DONE_PARTIAL'].includes(state.currentPhase)) {
       state.polling = false;
+      fetchDiff();
+      fetchCertificate();
     }
   } catch (err) {
     if (!state.demoMode) {
-      console.warn('API unavailable, loading demo data:', err.message);
       await loadDemoData();
     }
     return;
   }
-
   if (state.polling) {
     setTimeout(pollEvents, 1000);
   }
@@ -308,9 +448,9 @@ async function pollEvents() {
 async function loadDemoData() {
   state.demoMode = true;
   state.polling = false;
-
   try {
     const resp = await fetch('../fixtures/demo-run.jsonl');
+    if (!resp.ok) throw new Error('demo not found');
     const text = await resp.text();
     const lines = text.trim().split('\n');
     const events = lines.map((line, i) => {
@@ -318,27 +458,49 @@ async function loadDemoData() {
       ev._i = i;
       return ev;
     });
-
-    processEvents(events);
-    showDashboard();
-    setStatus('Demo mode (no API connection)');
+    showApp();
+    for (let i = 0; i < events.length; i++) {
+      processEvent(events[i]);
+      state.lastIdx = i;
+      await new Promise(r => setTimeout(r, 120));
+    }
+    fetchDiff();
+    fetchCertificate();
   } catch (err) {
-    console.error('Failed to load demo data:', err);
-    setStatus('Failed to load demo data', true);
+    $('loading-screen').innerHTML = '<p class="text-gray-500 text-center">Could not connect to API or load demo data.</p>';
   }
+}
+
+function initCertToggle() {
+  const toggle = $('cert-toggle');
+  const content = $('cert-content');
+  const chevron = $('cert-chevron');
+  let open = true;
+  toggle.addEventListener('click', () => {
+    open = !open;
+    content.classList.toggle('hidden', !open);
+    chevron.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+  });
+}
+
+function initDownload() {
+  $('cert-download-btn').addEventListener('click', () => {
+    if (!state.certRaw) return;
+    const blob = new Blob([state.certRaw], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HIPnosis-certificate-${state.runId}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 function init() {
   state.runId = getRunId();
-  document.getElementById('run-id').textContent = state.runId;
-
-  renderTimeline();
-  renderErrors();
-  renderEfficiency();
-  renderWave64();
-  renderFixes();
-  renderVerdict();
-
+  $('run-id').textContent = state.runId;
+  initCertToggle();
+  initDownload();
   pollEvents();
 }
 

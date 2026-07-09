@@ -1,63 +1,279 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HIPnosis Dashboard</title>
+  <title>HIPnosis — Autonomous CUDA→ROCm Porting Agent</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; }
-    .phase-active { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/diff.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            amd: '#ED1C24',
+            surface: { 900: '#0a0a0f', 800: '#111118', 700: '#1a1a24', 600: '#252530' },
+          },
+          fontFamily: { mono: ['JetBrains Mono', 'ui-monospace', 'monospace'] },
+        }
+      }
     }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+      50% { box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.2); }
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    @keyframes slide-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes count-up {
+      from { opacity: 0; transform: scale(0.8); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes bar-grow {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    .animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
+    .animate-count { animation: count-up 0.5s ease-out forwards; }
+    .pulse-active { animation: pulse-glow 2s ease-in-out infinite; }
+    .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+    .bar-animate { animation: bar-grow 0.6s ease-out forwards; transform-origin: left; }
+
+    .diff-container pre { margin: 0; padding: 0; background: transparent !important; }
+    .diff-container .hljs { background: transparent !important; padding: 0 !important; }
+    .diff-line { padding: 1px 12px; white-space: pre; font-size: 13px; line-height: 1.6; }
+    .diff-add { background: rgba(34, 197, 94, 0.12); border-left: 3px solid #22c55e; }
+    .diff-del { background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; }
+    .diff-hunk { background: rgba(59, 130, 246, 0.08); color: #60a5fa; border-left: 3px solid #3b82f6; }
+    .diff-meta { color: #6b7280; }
+
+    .sparkline-path { stroke-dasharray: 200; stroke-dashoffset: 200; animation: draw-line 1s ease-out forwards; }
+    @keyframes draw-line { to { stroke-dashoffset: 0; } }
+
+    .glass { background: rgba(17, 17, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+    .glass-hover:hover { border-color: rgba(237, 28, 36, 0.3); }
+
+    .cert-content h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: #f1f5f9; }
+    .cert-content h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #e2e8f0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.25rem; }
+    .cert-content h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.25rem; color: #cbd5e1; }
+    .cert-content p { margin: 0.5rem 0; color: #94a3b8; line-height: 1.6; }
+    .cert-content blockquote { border-left: 3px solid #ED1C24; padding-left: 1rem; margin: 0.75rem 0; color: #94a3b8; font-style: italic; }
+    .cert-content code { background: rgba(255,255,255,0.06); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; color: #e2e8f0; }
+    .cert-content pre code { display: block; padding: 1rem; overflow-x: auto; }
+    .cert-content table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+    .cert-content th, .cert-content td { padding: 0.5rem 0.75rem; border: 1px solid rgba(255,255,255,0.08); text-align: left; font-size: 0.875rem; }
+    .cert-content th { background: rgba(255,255,255,0.04); color: #e2e8f0; font-weight: 600; }
+    .cert-content td { color: #94a3b8; }
+    .cert-content ul, .cert-content ol { padding-left: 1.5rem; margin: 0.5rem 0; color: #94a3b8; }
+    .cert-content li { margin: 0.25rem 0; }
+    .cert-content strong { color: #f1f5f9; }
+    .cert-content hr { border: none; border-top: 1px solid rgba(255,255,255,0.08); margin: 1.5rem 0; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    .section-reveal { opacity: 0; }
+    .section-reveal.visible { opacity: 1; animation: slide-up 0.5s ease-out forwards; }
   </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen">
-  <div class="container mx-auto px-4 py-8 max-w-7xl">
-    <header class="mb-8">
-      <h1 class="text-4xl font-bold text-red-500 mb-2">HIPnosis</h1>
-      <p class="text-gray-400">CUDA → ROCm/AMD Port Dashboard</p>
-      <p class="text-sm text-gray-500 mt-2">Run: <span id="run-id" class="text-gray-300 font-mono"></span></p>
-    </header>
+<body class="bg-surface-900 text-gray-100 min-h-screen">
+  <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-    <div id="status" class="mb-6 p-4 bg-gray-800 rounded-lg text-center text-gray-400">
-      Connecting...
+    <div id="loading-screen" class="flex flex-col items-center justify-center min-h-[60vh]">
+      <div class="w-12 h-12 border-2 border-amd border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p class="text-gray-500 text-sm">Connecting to HIPnosis orchestrator...</p>
     </div>
 
-    <div id="dashboard" class="space-y-8" style="display: none;">
-      <section id="timeline-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Phase Timeline</h2>
-        <div id="timeline" class="flex flex-wrap gap-2"></div>
+    <div id="app" class="hidden space-y-8">
+
+      <header class="relative">
+        <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
+          <div>
+            <div class="flex items-center gap-3 mb-1">
+              <div class="w-8 h-1 bg-amd rounded-full"></div>
+              <span class="text-xs font-semibold tracking-widest uppercase text-amd">AMD Developer Hackathon</span>
+            </div>
+            <h1 class="text-5xl sm:text-6xl font-black tracking-tight">
+              <span class="text-white">HIP</span><span class="text-amd">nosis</span>
+            </h1>
+            <p class="text-gray-400 mt-2 text-lg">Autonomous CUDA → ROCm/AMD porting agent</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <div class="text-right">
+              <div class="text-xs text-gray-500 uppercase tracking-wider">Run</div>
+              <div id="run-id" class="font-mono text-sm text-gray-300"></div>
+            </div>
+            <div id="status-badge" class="px-4 py-2 rounded-full text-sm font-bold bg-gray-700 text-gray-400">
+              INITIALIZING
+            </div>
+          </div>
+        </div>
+
+        <div id="hero-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Errors Resolved</span>
+              <svg id="sparkline-errors" class="w-16 h-8" viewBox="0 0 64 32"></svg>
+            </div>
+            <div class="flex items-end gap-2">
+              <span id="metric-errors" class="text-4xl font-black text-white animate-count">—</span>
+              <span id="metric-errors-sub" class="text-sm text-gray-500 mb-1"></span>
+            </div>
+          </div>
+
+          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Resolved Locally</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Gemma 3 · $0 API</span>
+            </div>
+            <div class="flex items-end gap-2">
+              <span id="metric-local" class="text-4xl font-black text-emerald-400 animate-count">—</span>
+              <span class="text-sm text-gray-500 mb-1">%</span>
+            </div>
+          </div>
+
+          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Cloud API Cost</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">$0.00</span>
+            </div>
+            <div class="flex items-end gap-2">
+              <span id="metric-cost" class="text-4xl font-black text-green-400 animate-count">$0</span>
+              <span class="text-sm text-gray-500 mb-1">USD</span>
+            </div>
+          </div>
+
+          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Wave64 Caught</span>
+              <span class="w-2 h-2 rounded-full bg-amber-400 pulse-dot"></span>
+            </div>
+            <div class="flex items-end gap-2">
+              <span id="metric-wave64" class="text-4xl font-black text-amber-400 animate-count">—</span>
+              <span class="text-sm text-gray-500 mb-1">findings</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section id="timeline-section" class="section-reveal">
+        <div class="glass rounded-2xl p-6">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Pipeline Phases</h2>
+          <div id="timeline" class="flex flex-wrap gap-2"></div>
+        </div>
       </section>
 
-      <section id="errors-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Error Count (Descending)</h2>
-        <div id="errors-chart" class="space-y-2"></div>
+      <section id="wave64-section" class="section-reveal">
+        <div class="glass rounded-2xl p-6 border-l-4 border-l-amber-500">
+          <div class="flex items-start gap-3 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold text-amber-300">Wave64 Divergence Detection</h2>
+              <p class="text-sm text-gray-400 mt-1 leading-relaxed">AMD's wavefront is <strong class="text-white">64 lanes</strong>, not 32. HIPnosis detects this statically — a textual port (hipify) misses it, producing <em>silently incorrect</em> numerical results.</p>
+            </div>
+          </div>
+          <div id="wave64-table" class="overflow-x-auto"></div>
+        </div>
       </section>
 
-      <section id="efficiency-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Efficiency</h2>
-        <div id="efficiency-stats" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+      <section id="diff-section" class="section-reveal">
+        <div class="glass rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Code Transformation</h2>
+              <p class="text-xs text-gray-600 mt-0.5">CUDA → HIP — the real diff</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-red-500"></span>
+              <span class="text-xs text-gray-500">before</span>
+              <span class="w-2 h-2 rounded-full bg-green-500 ml-2"></span>
+              <span class="text-xs text-gray-500">after</span>
+            </div>
+          </div>
+          <div id="diff-container" class="diff-container overflow-x-auto max-h-[500px] p-4 font-mono text-sm bg-[#0d1117]">
+            <p class="text-gray-600 text-center py-8">Waiting for REPORTING phase...</p>
+          </div>
+        </div>
       </section>
 
-      <section id="wave64-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Wave64 Findings</h2>
-        <div id="wave64-table" class="overflow-x-auto"></div>
+      <section id="burndown-section" class="section-reveal">
+        <div class="glass rounded-2xl p-6">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Error Burndown</h2>
+          <div id="burndown-chart" class="space-y-3"></div>
+        </div>
       </section>
 
-      <section id="fixes-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Fixes Applied</h2>
-        <div id="fixes-summary" class="mb-4"></div>
-        <div id="fixes-table" class="overflow-x-auto"></div>
+      <section id="fixes-section" class="section-reveal">
+        <div class="glass rounded-2xl p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Fixes Applied</h2>
+            <div id="fixes-counters" class="flex gap-2"></div>
+          </div>
+          <div id="fixes-tokens-bar" class="mb-4 hidden">
+            <div class="flex items-center gap-3 text-xs text-gray-500 mb-1">
+              <span>Local (Gemma)</span>
+              <span class="flex-1"></span>
+              <span>Remote (Cloud)</span>
+            </div>
+            <div class="h-3 bg-surface-600 rounded-full overflow-hidden flex">
+              <div id="tokens-local-bar" class="h-full bg-emerald-500 transition-all duration-700 rounded-l-full"></div>
+              <div id="tokens-remote-bar" class="h-full bg-blue-500 transition-all duration-700 rounded-r-full"></div>
+            </div>
+          </div>
+          <div id="fixes-table" class="overflow-x-auto"></div>
+        </div>
       </section>
 
-      <section id="verdict-section" class="bg-gray-800 rounded-lg p-6">
-        <h2 class="text-2xl font-bold mb-4 text-red-400">Verification Verdict</h2>
-        <div id="verdict" class="text-center text-6xl font-bold py-8"></div>
-        <div id="verdict-detail" class="text-center text-gray-400 mt-4"></div>
+      <section id="verdict-section" class="section-reveal">
+        <div class="glass rounded-2xl p-8 text-center">
+          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-6">Verification Verdict</h2>
+          <div id="verdict" class="text-7xl sm:text-8xl font-black py-4 text-gray-700">...</div>
+          <div id="verdict-detail" class="text-gray-400 mt-4 max-w-2xl mx-auto text-sm leading-relaxed"></div>
+        </div>
       </section>
+
+      <section id="certificate-section" class="section-reveal">
+        <div class="glass rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+            <div>
+              <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Port Certificate</h2>
+              <p class="text-xs text-gray-600 mt-0.5">The deliverable</p>
+            </div>
+            <button id="cert-download-btn" class="hidden px-3 py-1.5 rounded-lg bg-amd/10 text-amd text-xs font-semibold hover:bg-amd/20 transition-colors border border-amd/20">
+              Download .md
+            </button>
+          </div>
+          <div id="cert-toggle" class="px-6 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors flex items-center gap-2 hidden">
+            <svg id="cert-chevron" class="w-4 h-4 text-gray-500 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            <span class="text-sm text-gray-400">Expand certificate</span>
+          </div>
+          <div id="cert-content" class="cert-content px-6 py-6 max-h-[600px] overflow-y-auto hidden"></div>
+        </div>
+      </section>
+
+      <footer class="text-center py-8 text-xs text-gray-600">
+        HIPnosis · AMD Developer Hackathon ACT II · Track 3 Unicorn + Gemma Prize
+      </footer>
     </div>
   </div>
 
