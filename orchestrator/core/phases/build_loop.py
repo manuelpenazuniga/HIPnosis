@@ -26,6 +26,7 @@ from core.oracle.base import Oracle
 from core.patcher import PatchStatus, apply_patch
 from core.phases.loop import (
     ApplyFn,
+    ApplyOutcome,
     ClassifyFn,
     LoopResult,
     ProposeFixFn,
@@ -97,16 +98,21 @@ def make_loop_functions(
     ctx: PipelineContext,
     oracle: Oracle,
     rules: list,
-) -> tuple[ClassifyFn, Callable, ProposeFixFn, ApplyFn]:
+) -> tuple[ClassifyFn, Callable, ProposeFixFn, ApplyFn, dict]:
     """Build the four injected functions for ``run_build_loop``.
 
     Closure shares mutable ``_strategy`` so that ``propose_fix_fn`` and
     ``apply_fn`` know whether the current group follows the deterministic
     or LLM path without changing the loop's contract (INV-1).
+
+    Devuelve además ``tokens`` (dict mutable ``{"local": n, "remote": n}``)
+    que ``propose_fix_fn`` va acumulando con el usage REAL de cada llamada
+    LLM — F-17: los counters de tokens salen de mediciones, no de estimaciones.
     """
     _strategy: str = "llm"
     _group: ErrorGroup | None = None
     _klass: str = "E99"
+    tokens: dict[str, int] = {"local": 0, "remote": 0}
 
     def classify_fn(g: ErrorGroup) -> str:
         nonlocal _group, _klass
@@ -134,6 +140,16 @@ def make_loop_functions(
             return fix or ""
 
         if tier == "deterministic":
+            return ""
+
+        # MOCK del tier LLM (INV-1: el LLM es una función de CONTENIDO, y en
+        # mock el contenido sale de un fixture del workspace). El patcher, el
+        # commit, el build posterior y el delta siguen siendo REALES — lo
+        # único enlatado es la propuesta (audit codex P0.5).
+        if ctx.config.oracle_mode == "mock":
+            demo = Path(ctx.repo_dir) / ".hipnosis" / "demo-patches" / f"{_klass}.md"
+            if demo.is_file():
+                return demo.read_text(encoding="utf-8")
             return ""
 
         try:
@@ -181,41 +197,49 @@ def make_loop_functions(
                 history=history,
             )
             resp = client.complete(system, user)
+            if tier in tokens:
+                tokens[tier] += resp.tokens or 0
             return resp.text
         except Exception:
             return ""
 
-    def apply_fn(patch: str, msg: str) -> int:
+    def apply_fn(patch: str, msg: str) -> ApplyOutcome:
+        # P0.4/P0.5: apply SOLO toca el workspace. No compila (el delta real
+        # lo mide el loop con el oracle) y no inventa resultados. Devuelve el
+        # commit y cómo revertirlo si el build posterior no mejora.
         if _strategy == "deterministic":
             if not patch or not _group:
-                return 1
-            touched = _apply_deterministic_fix(
-                patch, _group, ctx.repo_dir
-            )
+                return ApplyOutcome(applied_ws=False)
+            touched = _apply_deterministic_fix(patch, _group, ctx.repo_dir)
+            if touched == 0:
+                # El template no matcheó nada: el workspace no cambió.
+                return ApplyOutcome(applied_ws=False)
             try:
                 repo = GitRepo(ctx.repo_dir)
-                repo.commit_all(msg)
+                sha = repo.commit_all(msg)
             except Exception:
-                pass
-            build_result = oracle.build()
-            return -1 if touched > 0 else 0
+                return ApplyOutcome(applied_ws=False)
+            return ApplyOutcome(applied_ws=True, commit=sha, revert=repo.revert_head)
 
         if not patch:
-            return 1
+            return ApplyOutcome(applied_ws=False)
 
         try:
             repo = GitRepo(ctx.repo_dir)
         except Exception:
-            return 1
+            return ApplyOutcome(applied_ws=False)
 
         result = apply_patch(patch, repo, msg, ctx.trace)
         if result.status != PatchStatus.APPLIED:
-            return 1
+            return ApplyOutcome(applied_ws=False)
 
-        build_result = oracle.build()
-        return -1
+        return ApplyOutcome(
+            applied_ws=True,
+            commit=result.commit_sha,
+            revert=repo.revert_head,
+        )
 
-    return classify_fn, decide_tier_fn, propose_fix_fn, apply_fn
+    return classify_fn, decide_tier_fn, propose_fix_fn, apply_fn, tokens
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +263,7 @@ def build_loop_handler(ctx: PipelineContext) -> None:
         return
 
     rules = load_rules()
-    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn = make_loop_functions(
+    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn, tokens = make_loop_functions(
         ctx, oracle, rules
     )
     result: LoopResult = run_build_loop(
@@ -251,6 +275,12 @@ def build_loop_handler(ctx: PipelineContext) -> None:
         propose_fix_fn=propose_fix_fn,
         apply_fn=apply_fn,
     )
+    # F-17: tokens MEDIDOS de las llamadas LLM reales (usage de la API).
+    result.counters.tokens_local += tokens["local"]
+    result.counters.tokens_remote += tokens["remote"]
+    # P0.8: el resultado tipado queda en el ctx — REPORTING construye el
+    # certificado desde ESTE snapshot y el driver decide la ruta (P0.9).
+    ctx.loop_result = result
     ctx.store.update_counters(ctx.run.id, result.counters)
     ctx.trace.emit(
         "build_loop.done",

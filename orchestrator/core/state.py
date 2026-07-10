@@ -512,14 +512,49 @@ def run_pipeline(
         store.update_state(run_id, state)
 
         handler = handlers.get(state)
-        if handler is None:
-            continue
+        if handler is not None:
+            try:
+                handler(ctx)
+            except Exception as exc:  # noqa: BLE001 — INV-5: catch, do not re-raise
+                return _fail_run(run_id, store, trace, exc)
 
+        # P0.9 (audit codex): el resultado del ORÁCULO decide la ruta, no la
+        # secuencia lineal. Un BUILD_LOOP sin éxito NO sigue a RUNNING/PARITY
+        # (verificar un build fallido no tiene sentido): se reporta honesto y
+        # el run termina DONE_PARTIAL — final legítimo (INV-5).
+        if state == RunState.BUILD_LOOP:
+            loop_result = getattr(ctx, "loop_result", None)
+            if loop_result is not None and not loop_result.success:
+                return _finish_partial(run_id, store, trace, ctx, handlers)
+
+    final = store.get(run_id)
+    assert final is not None
+    return final
+
+
+def _finish_partial(
+    run_id: str,
+    store: SqliteRunStore,
+    trace: TraceWriter,
+    ctx: "PipelineContext",
+    handlers: dict[str, PhaseHandler],
+) -> Run:
+    """Ruta honesta de salida cuando el build loop no llegó a verde (P0.9).
+
+    Ejecuta REPORTING (el certificado con la sección NEEDS_HUMAN es parte
+    del contrato de degradación honesta) y deja el run en ``DONE_PARTIAL``.
+    """
+    trace.emit("phase", phase=RunState.REPORTING)
+    store.update_state(run_id, RunState.REPORTING)
+    handler = handlers.get(RunState.REPORTING)
+    if handler is not None:
         try:
             handler(ctx)
-        except Exception as exc:  # noqa: BLE001 — INV-5: catch, do not re-raise
+        except Exception as exc:  # noqa: BLE001 — INV-5
             return _fail_run(run_id, store, trace, exc)
 
+    trace.emit("phase", phase=RunState.DONE_PARTIAL)
+    store.update_state(run_id, RunState.DONE_PARTIAL)
     final = store.get(run_id)
     assert final is not None
     return final

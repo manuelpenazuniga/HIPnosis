@@ -44,23 +44,98 @@ def trace_path_for_run(run_id: str) -> str:
     return str(_ORCH_ROOT / "workspaces" / run_id / "trace.jsonl")
 
 
-def _stage_mock_workspace(repo_dir: str) -> None:
-    """Stage una fuente CUDA mínima + git init (mock hermético, sin red).
+# Contenido staged por repo demo (audit codex P0.5): el workspace mock debe
+# CONTENER lo que los fixtures de build reportan, para que cada fix del loop
+# transforme archivos de verdad y la convergencia sea causal (fix aplicado →
+# build mejora), no un cursor que avanza gratis.
+_MOCK_FILES: dict[str, dict[str, str]] = {
+    "bsw": {
+        "kernel.cu": (
+            "#include <cuda_runtime.h>\n"
+            '#include "bsw_kernel.h"\n\n'
+            "__global__ void sw_align(const char* seqA, const char* seqB) {\n"
+            "  unsigned mask = __ballot_sync(0xffffffff, threadIdx.x < 64);\n"
+            "  int x = 0;\n"
+            "  x = __shfl_down_sync(0xffffffff, x, 16);\n"
+            "}\n"
+        ),
+        "main.cu": (
+            "#include <cuda_runtime.h>\n\n"
+            "char hA[64]; char hB[64];\n"
+            "int main() {\n"
+            "  cudaMemcpyToSymbol(dA, hA, 64);\n"
+            "  cudaMemcpyToSymbol(dB, hB, 64);\n"
+            "  return 0;\n"
+            "}\n"
+        ),
+        "kernel_wrapper.cu": (
+            "#include <cuda_runtime.h>\n\n"
+            "char hW[16];\n"
+            "void upload() { cudaMemcpyToSymbol(dW, hW, 16); }\n"
+        ),
+        # Mock del TIER LLM (ver propose_fix_fn): el patch E05 sale enlatado,
+        # pero el patcher, el commit, el build y el delta son reales.
+        ".hipnosis/demo-patches/E05.md": (
+            "FILE: kernel.cu\n"
+            "<<<<<<< SEARCH\n"
+            "  unsigned mask = __ballot_sync(0xffffffff, threadIdx.x < 64);\n"
+            "=======\n"
+            "  unsigned long long mask = __ballot(threadIdx.x < 64);\n"
+            ">>>>>>> REPLACE\n\n"
+            "FILE: kernel.cu\n"
+            "<<<<<<< SEARCH\n"
+            "  x = __shfl_down_sync(0xffffffff, x, 16);\n"
+            "=======\n"
+            "  x = __shfl_down(x, 16);\n"
+            ">>>>>>> REPLACE\n"
+        ),
+    },
+    "softmax": {
+        "main.cu": (
+            "#include <cuda_runtime.h>\n\n"
+            "int main() {\n"
+            "  float *d;\n"
+            "  cudaMalloc(&d, 1024);\n"
+            "  cudaMemcpy(d, d, 1024, cudaMemcpyHostToDevice);\n"
+            "  return 0;\n"
+            "}\n"
+        ),
+    },
+    "scan": {
+        "main.cu": (
+            "#include <cuda_runtime.h>\n\n"
+            "int main() {\n"
+            "  cudaDeviceProp prop;\n"
+            "  cudaGetDeviceProperties(&prop, 0);\n"
+            "  float *a; float *b;\n"
+            "  cudaMalloc(&a, 4096);\n"
+            "  cudaMalloc(&b, 4096);\n"
+            "  cudaMemcpy(a, b, 4096, cudaMemcpyHostToDevice);\n"
+            "  cudaMemcpy(b, a, 4096, cudaMemcpyDeviceToHost);\n"
+            "  cudaMemcpy(a, a, 4096, cudaMemcpyDeviceToDevice);\n"
+            "  cudaFree(a);\n"
+            "  cudaFree(b);\n"
+            "  return 0;\n"
+            "}\n"
+        ),
+    },
+}
 
-    Incluye un ``#include <cuda_runtime.h>`` y llamadas cudaX para que los fixes
-    deterministas (E01/E02) tengan algo real que transformar en la demo.
+
+def _stage_mock_workspace(repo_dir: str, key: str = "bsw") -> None:
+    """Stage la fuente CUDA del repo demo ``key`` + git init (hermético, sin red).
+
+    Los archivos contienen EXACTAMENTE los constructos que los fixtures de
+    ``fixtures/<key>/build_*.txt`` reportan como errores, para que los fixes
+    del loop (deterministas o enlatados) los transformen de verdad.
     """
+    files = _MOCK_FILES.get(key, _MOCK_FILES["bsw"])
     os.makedirs(repo_dir, exist_ok=True)
-    Path(repo_dir, "kernel.cu").write_text(
-        "#include <cuda_runtime.h>\n"
-        '\nextern "C" void launch() {\n'
-        "  float *d;\n"
-        "  cudaMalloc(&d, 1024);\n"
-        "  cudaMemcpy(d, d, 1024, cudaMemcpyHostToDevice);\n"
-        "  cudaFree(d);\n"
-        "}\n"
-    )
-    Path(repo_dir, "Makefile").write_text("CC = nvcc\nARCH = sm_60\nmain: kernel.cu\n\t$(CC) -arch=$(ARCH) kernel.cu -o main\nrun: main\n\t./main\n")
+    for rel, content in files.items():
+        path = Path(repo_dir, rel)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+    Path(repo_dir, "Makefile").write_text("CC = nvcc\nARCH = sm_60\nmain: main.cu\n\t$(CC) -arch=$(ARCH) main.cu -o main\nrun: main\n\t./main\n")
     subprocess.run(["git", "init", "-q"], cwd=repo_dir, check=True)
     subprocess.run(["git", "add", "-A"], cwd=repo_dir, check=True, capture_output=True)
     subprocess.run(
@@ -138,7 +213,7 @@ def execute_run(run_id: str, store: SqliteRunStore, config: Config) -> Run:
         os.makedirs(os.path.dirname(repo_dir), exist_ok=True)
         GitRepo.clone(run.repo_url, repo_dir)
     else:
-        _stage_mock_workspace(repo_dir)
+        _stage_mock_workspace(repo_dir, key=_fixtures_key(run.repo_url))
 
     manifest = _resolve_manifest(run.repo_url, config.oracle_mode)
     oracle = _make_oracle(config, repo_dir, run.repo_url, manifest)

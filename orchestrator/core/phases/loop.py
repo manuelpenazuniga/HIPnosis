@@ -24,7 +24,7 @@ import yaml
 from core.config import Config
 from core.errparse import group as err_group
 from core.errparse import parse as err_parse
-from core.schemas import Counters, ErrorGroup
+from core.schemas import BuildError, Counters, ErrorGroup
 from core.trace import TraceWriter
 
 
@@ -36,8 +36,23 @@ ClassifyFn = Callable[[ErrorGroup], str]
 ProposeFixFn = Callable[[ErrorGroup, str, int], str]
 """(group, tier, attempts) -> patch text ('' si no puede proponer)."""
 
-ApplyFn = Callable[[str, str], int]
-"""(patch, commit_msg) -> build error delta. <=0 mejora, >0 empeora."""
+
+@dataclass
+class ApplyOutcome:
+    """Resultado de aplicar un patch al WORKSPACE (no dice nada del build).
+
+    El delta real lo mide el LOOP compilando después de aplicar (audit codex
+    P0.4): apply solo reporta si el workspace quedó parcheado+commiteado y
+    cómo deshacerlo. ``revert`` es un callable (git reset --hard HEAD~1 vía
+    gitrepo) que el loop invoca si el build posterior no mejora.
+    """
+    applied_ws: bool
+    commit: str = ""
+    revert: Optional[Callable[[], None]] = None
+
+
+ApplyFn = Callable[[str, str], ApplyOutcome]
+"""(patch, commit_msg) -> ApplyOutcome. NUNCA compila internamente."""
 
 
 @dataclass
@@ -139,23 +154,35 @@ def run_build_loop(
     iteration = 0
     signature_history: list[set[str]] = []
     no_progress = 0
-    prev_errors: Optional[int] = None
+    prev_effective: Optional[int] = None
     needs_human: list[str] = []
     persistent_groups: dict[str, ErrorGroup] = {}
 
+    def _effective(res) -> int:
+        """Errores "efectivos" de un build (P0.3): un build con returncode
+        distinto de 0 pero SIN líneas ``: error:`` (make roto, linker crash,
+        'No rule to make target') cuenta como 1 — jamás como green."""
+        if res.count > 0:
+            return res.count
+        return 0 if res.ok else 1
+
+    # Build inicial. Los builds siguientes los produce el paso de fix (uno
+    # por parche aplicado) y se REUTILIZAN como estado de la iteración
+    # siguiente — una sola compilación por transición observable (P0.5).
+    result = oracle.build()
+
     while iteration < cfg.max_iterations:
-        # --- BUILD ---
-        result = oracle.build()
+        effective = _effective(result)
 
         if counters.errors_initial == 0:
-            counters.errors_initial = result.count
+            counters.errors_initial = effective
 
-        delta_build = result.count - prev_errors if prev_errors is not None else 0
-        trace.emit("build", iteration=iteration, errors=result.count,
-                   delta=delta_build)
+        delta_build = effective - prev_effective if prev_effective is not None else 0
+        trace.emit("build", iteration=iteration, errors=effective,
+                   delta=delta_build, ok=result.ok)
 
-        # --- GREEN? ---
-        if result.count == 0:
+        # --- GREEN? (P0.3: exige result.ok, no solo cero líneas ': error:') ---
+        if result.ok and result.count == 0:
             counters.errors_current = 0
             counters.iterations = iteration
             return LoopResult(
@@ -169,6 +196,21 @@ def run_build_loop(
         # --- PARSE + GROUP ---
         errors = err_parse(result.raw_output, cfg.max_errors_parsed)
         groups = err_group(errors)
+        if not groups:
+            # Build fallido sin errores parseables: grupo sintético E13
+            # (build_system) para que el loop lo trabaje — NUNCA success (P0.3).
+            tail = "\n".join(result.raw_output.splitlines()[-8:])[:500]
+            groups = [ErrorGroup(
+                signature="buildsys::nonzero-exit",
+                errors=[BuildError(
+                    file="<build>", line=0, col=0,
+                    message=(
+                        f"build exited {result.returncode} with no parseable "
+                        f"': error:' lines: {tail}"
+                    ),
+                    signature="buildsys::nonzero-exit",
+                )],
+            )]
 
         # Persist group state across iterations
         for g in groups:
@@ -185,20 +227,20 @@ def run_build_loop(
         oscillating = _detect_oscillating(signature_history, cur_sigs)
 
         # --- PROGRESS ---
-        if prev_errors is not None and result.count >= prev_errors:
+        if prev_effective is not None and effective >= prev_effective:
             no_progress += 1
         else:
             no_progress = 0
 
         # INV-10/INV-9: N consecutive non-improving builds → honest exit (umbral de config)
         if no_progress >= cfg.stagnation_exit:
-            counters.errors_current = result.count
+            counters.errors_current = effective
             counters.iterations = iteration
             for g in groups:
                 needs_human.append(g.signature)
             return LoopResult(
                 success=False,
-                final_errors=result.count,
+                final_errors=effective,
                 iterations=iteration,
                 needs_human=needs_human,
                 counters=counters,
@@ -210,14 +252,14 @@ def run_build_loop(
             if g.status == "open" and g.attempts < cfg.max_attempts_per_group
         ]
         if not open_groups:
-            counters.errors_current = result.count
+            counters.errors_current = effective
             counters.iterations = iteration
             for g in groups:
                 if g.attempts >= cfg.max_attempts_per_group:
                     needs_human.append(g.signature)
             return LoopResult(
                 success=False,
-                final_errors=result.count,
+                final_errors=effective,
                 iterations=iteration,
                 needs_human=needs_human,
                 counters=counters,
@@ -227,6 +269,10 @@ def run_build_loop(
 
         # --- CLASSIFY + DECIDE TIER ---
         klass = classify_fn(g)
+        if g.signature == "buildsys::nonzero-exit":
+            # Clase derivada de la ESTRUCTURA (returncode), no del contenido:
+            # decisión de control, no de LLM (P0.3).
+            klass = "E13"
         strategy, tier_sugerido = _RULE_INFO.get(
             klass, ("llm", "local_then_remote")
         )
@@ -240,13 +286,39 @@ def run_build_loop(
         if no_progress >= cfg.stagnation_force_remote:
             tier = "remote"
 
-        # --- FIX ---
+        # --- FIX (P0.4: el compilador es el oráculo del fix) ---
+        # Secuencia: apply (solo workspace) → build → delta REAL → revert si
+        # no mejora. El BuildResult "after" se reutiliza como estado de la
+        # próxima iteración (una compilación por transición, P0.5).
         patch = propose_fix_fn(g, tier, g.attempts)
-        # No llamar apply con patch vacío (propose_fix no produjo nada): es un intento fallido.
-        delta = apply_fn(patch, f"fix({klass}): iter {iteration} [tier={tier}]") if patch != "" else 1
-        # "applied" = mejoró de VERDAD (INV-7/F-17: solo así cuenta como fix). Un patch vacío o
-        # que no bajó errores (delta>=0) NO es un fix — consume un intento del grupo.
-        applied = patch != "" and delta < 0
+        outcome = (
+            apply_fn(patch, f"fix({klass}): iter {iteration} [tier={tier}]")
+            if patch != "" else ApplyOutcome(applied_ws=False)
+        )
+
+        applied = False
+        delta = 1  # convención: intento sin efecto medible = +1 (consume intento)
+        commit_sha = ""
+        next_result = result
+
+        if outcome.applied_ws:
+            after = oracle.build()
+            delta = _effective(after) - effective
+            improved = (
+                _effective(after) < effective
+                or (after.ok and not result.ok)
+            )
+            if improved:
+                applied = True
+                commit_sha = outcome.commit
+                next_result = after
+            else:
+                # El parche no mejoró el build real → se REVIERTE (INV-3).
+                # Si el revert falla, la excepción se propaga: la FSM lo
+                # convierte en FAILED — jamás seguir sobre un estado mentiroso.
+                if outcome.revert is not None:
+                    outcome.revert()
+                next_result = result  # workspace restaurado = build previo vigente
 
         trace.emit(
             "fix",
@@ -255,6 +327,7 @@ def run_build_loop(
             tier=tier,
             applied=applied,
             delta=delta,
+            commit=commit_sha,
             attempt=g.attempts,
             iteration=iteration,
         )
@@ -268,14 +341,16 @@ def run_build_loop(
             elif tier == "remote":
                 counters.fixes_remote += 1
         else:
-            # patch vacío, sin cambio (delta==0) o empeoró (delta>0) → intento fallido consumido.
+            # patch vacío, no aplicable, sin mejora o que empeoró → se revirtió
+            # y consume un intento del grupo.
             g.attempts += 1
 
-        prev_errors = result.count
+        prev_effective = effective
         iteration += 1
+        result = next_result
 
     # INV-10: exhausted max_iterations (hard cap)
-    counters.errors_current = prev_errors or 0
+    counters.errors_current = _effective(result)
     counters.iterations = iteration
     return LoopResult(
         success=False,

@@ -23,12 +23,10 @@ def _cfg() -> Config:
 
 
 def test_full_pipeline_reaches_done_with_verify_and_certificate(tmp_path):
-    repo = tmp_path / "repo"; repo.mkdir()
-    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
-    (repo / "kernel.cu").write_text('#include <cuda_runtime.h>\nvoid k(){float*d; cudaMalloc(&d,16); cudaFree(d);}\n')
-    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
-    subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "i"],
-                   cwd=repo, check=True, capture_output=True)
+    # Workspace causal: contiene lo que los fixtures bsw reportan (audit P0.5).
+    from core.runner import _stage_mock_workspace
+    repo = tmp_path / "repo"
+    _stage_mock_workspace(str(repo), key="bsw")
 
     store = SqliteRunStore(str(tmp_path / "r.db")); cfg = _cfg()
     run = store.create("https://ex/bsw.git")

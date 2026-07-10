@@ -1,4 +1,3 @@
 hipcc -O3 --offload-arch=gfx942 -c main.cu -o main.o
-main.cu:71:3: error: use of undeclared identifier 'cudaMalloc'
 main.cu:84:3: error: use of undeclared identifier 'cudaMemcpy'
-2 errors generated when compiling for gfx942.
+1 error generated when compiling for gfx942.

@@ -105,3 +105,20 @@ M5 README/video. El backend está funcionalmente completo en mock.
   wave64 panel héroe, sección diff (highlight.js), burndown, barras tokens local/remoto, certificado (marked.js).
   Verificado funcional (sintaxis JS, IDs, métricas, sirve en replay). Browser extension caído → sin screenshot.
 ====================================================================
+====================================================================
+🔒 AUDIT CODEX #1 — TRAMOS 1+2 EJECUTADOS (Gate A "truth before wow" + Gate B "oráculos de verdad"):
+Tramo 1: replay Docker reparado (git en imagen slim — la entrega estaba ROTA desde checkout limpio,
+  gate build --no-cache+up+healthz verificado); rocm/vllm pineada gfx94X + HF_TOKEN por env_file
+  (environment pisaba env_file — trampa evitada); procedencia honesta: fixture oracle_mode=mock,
+  badge 'REPLAY · synthetic demo' derivado del trace (auto-upgrade a 'recorded' con trace real M0),
+  README según tabla del audit.
+Tramo 2 (P0.3/4/5/7/8/9): green exige returncode==0 (grupo sintético E13 si exit!=0 sin ': error:');
+  delta de fix MEDIDO por el compilador (before/apply/after) con REVERT si no mejora (INV-3);
+  una build por transición (apply_fn ya no compila ni inventa deltas); verify exige ran+exit 0 y
+  borra output stale antes de correr; DONE_PARTIAL cableado en la FSM (loop fail → REPORTING →
+  DONE_PARTIAL, salta RUNNING/PARITY); cert==trace==sqlite (ctx.loop_result + refresh ctx.run);
+  tokens medidos del usage real de la API (F-17). Fixtures demo RE-AUTORADOS CAUSALES: el workspace
+  staged contiene exactamente lo que los fixtures reportan; softmax 3→2→1→0, scan 10→7→5→3→2→1→0;
+  E05 de bsw vía demo-patch enlatado (SOLO la propuesta es fixture; patcher/commit/build/delta reales).
+  378 tests (8 gates nuevos en test_oracle_gates.py). Verificado en vivo: 3 repos demo DONE con
+  todos los fixes applied=true y deltas reales.

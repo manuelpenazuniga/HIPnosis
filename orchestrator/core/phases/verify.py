@@ -212,6 +212,16 @@ def verify(
 
     mode = manifest.verify.mode
 
+    # P0.7 (audit codex): un output de una corrida ANTERIOR no puede
+    # sobrevivir a una ejecución fallida y colarse en la comparación —
+    # se borra antes de correr; solo se evalúa lo que ESTE run produjo.
+    if mode == "golden_output":
+        output_file = getattr(manifest.verify, "output_file", None)
+        if output_file:
+            stale = os.path.join(repo_dir, output_file)
+            if os.path.isfile(stale):
+                os.remove(stale)
+
     # 1. Correr el benchmark.
     t0 = time.monotonic()
     result = oracle.run(manifest.run.cmd, manifest.run.timeout_s)
@@ -221,7 +231,23 @@ def verify(
     parity: ParityResult
     verdict: str
 
-    if mode == "self_check":
+    # P0.7: el PROCESO es la primera condición del veredicto. Un binario que
+    # imprime "PASS" y muere con exit != 0 NO es un PASS — el texto solo se
+    # evalúa si la ejecución terminó limpia.
+    if mode in ("self_check", "golden_output") and (
+        not result.ran or result.exit_code != 0
+    ):
+        parity = ParityResult(
+            ok=False,
+            detail=(
+                f"process did not complete cleanly "
+                f"(ran={result.ran}, exit_code={result.exit_code}); "
+                f"output not evaluated"
+            ),
+        )
+        verdict = VERDICT_FAIL
+
+    elif mode == "self_check":
         assert manifest.verify.pass_regex is not None  # enforcé en core.manifest
         parity = check_self_check(result.stdout, manifest.verify.pass_regex)
         verdict = VERDICT_PASS if parity.ok else VERDICT_FAIL

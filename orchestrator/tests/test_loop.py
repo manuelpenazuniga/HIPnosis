@@ -21,6 +21,7 @@ from core.llm.router import decide_tier
 from core.oracle.mock import MockOracle
 from core.phases.loop import (
     ApplyFn,
+    ApplyOutcome,
     ClassifyFn,
     LoopResult,
     ProposeFixFn,
@@ -78,14 +79,15 @@ def _propose_dummy(_group: ErrorGroup, _tier: str, _attempts: int) -> str:
     return "dummy patch content"
 
 
-def _apply_good(_patch: str, _commit_msg: str) -> int:
-    """Stub: simula fix que mejora (delta negativo)."""
-    return -1
+def _apply_applies(_patch: str, _commit_msg: str) -> ApplyOutcome:
+    """Stub: el patch SÍ tocó el workspace (mejorar o no lo decide el
+    build siguiente del oracle — contrato post-audit P0.4)."""
+    return ApplyOutcome(applied_ws=True, commit="deadbeef")
 
 
-def _apply_bad(_patch: str, _commit_msg: str) -> int:
-    """Stub: simula fix que empeora (delta positivo)."""
-    return 1
+def _apply_noop(_patch: str, _commit_msg: str) -> ApplyOutcome:
+    """Stub: el patch no se pudo aplicar al workspace."""
+    return ApplyOutcome(applied_ws=False)
 
 
 # ---------------------------------------------------------------------------
@@ -105,7 +107,7 @@ def test_green_path_converges(tmp_path: Path) -> None:
         classify_fn=_classify_e01,
         decide_tier_fn=decide_tier,
         propose_fix_fn=_propose_dummy,
-        apply_fn=_apply_good,
+        apply_fn=_apply_applies,
     )
 
     assert isinstance(result, LoopResult)
@@ -159,7 +161,7 @@ def test_max_iterations_hard_cap(tmp_path: Path) -> None:
         classify_fn=_classify_e01,
         decide_tier_fn=decide_tier,
         propose_fix_fn=_propose_dummy,
-        apply_fn=_apply_good,
+        apply_fn=_apply_applies,
     )
 
     assert result.success is False
@@ -206,7 +208,7 @@ def test_stagnation_forces_remote_then_exits(tmp_path: Path) -> None:
         classify_fn=_classify_e01,
         decide_tier_fn=decide_tier,
         propose_fix_fn=_propose_capture,
-        apply_fn=_apply_good,
+        apply_fn=_apply_applies,
     )
 
     assert result.success is False
@@ -253,7 +255,7 @@ def test_revert_on_worsening_exhausts_group(tmp_path: Path) -> None:
         classify_fn=_classify_e01,
         decide_tier_fn=decide_tier,
         propose_fix_fn=_propose_dummy,
-        apply_fn=_apply_bad,        # siempre empeora
+        apply_fn=_apply_applies,    # aplica, pero el build nunca mejora → revert
     )
 
     assert result.success is False
@@ -303,7 +305,7 @@ def test_stagnation_exit_threshold_from_config(tmp_path):
     res = run_build_loop(_StuckOracle(), cfg, trace,
                          _classify_e01, decide_tier,
                          lambda g, t, a: "FILE: a.cu\n<<<<<<< SEARCH\nx\n=======\ny\n>>>>>>> REPLACE",
-                         lambda p, m: 0)   # apply nunca mejora (delta 0)
+                         lambda p, m: ApplyOutcome(applied_ws=False))   # apply nunca toca el workspace
     # Con stagnation_exit=2 debe cortar MUCHO antes de max_iterations=25.
     assert res.success is False
     assert res.iterations < 25
@@ -321,7 +323,7 @@ def test_empty_patch_does_not_inflate_counters(tmp_path):
     res = run_build_loop(_StuckOracle(), cfg, trace,
                          _classify_e01, decide_tier,
                          lambda g, t, a: "",       # propose_fix no produce patch
-                         lambda p, m: 0)
+                         lambda p, m: ApplyOutcome(applied_ws=False))
     # Ningún fix real → todos los counters de fixes en 0 (no inflados).
     assert res.counters.fixes_deterministic == 0
     assert res.counters.fixes_local == 0

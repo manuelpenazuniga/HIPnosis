@@ -55,6 +55,13 @@ def run_full_pipeline(
         ctx.verify_result = getattr(ctx, "verify", None)
 
     def _report(ctx) -> None:
+        # P0.8 (audit codex): ctx.run era el snapshot cargado ANTES de correr
+        # las fases → el certificado salía con counters en cero mientras el
+        # store y el trace tenían los reales. REPORTING refresca el run y
+        # construye certificado + evento report desde el MISMO estado.
+        fresh_run = store.get(run_id)
+        if fresh_run is not None:
+            ctx.run = fresh_run
         ship_handler(ctx)
         # Evento 'report': el resumen numérico que consume el dashboard.
         # Hasta ahora solo existía en el fixture demo — el pipeline real no lo

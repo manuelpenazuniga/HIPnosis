@@ -120,7 +120,7 @@ def test_make_loop_functions_classify_e01() -> None:
     )
     ctx.oracle = oracle
 
-    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn = make_loop_functions(
+    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn, _tokens = make_loop_functions(
         ctx, oracle, rules
     )
 
@@ -188,7 +188,7 @@ def test_deterministic_path_applies_substitution(tmp_path: Path) -> None:
     )
     ctx.oracle = oracle
 
-    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn = make_loop_functions(
+    classify_fn, decide_tier_fn, propose_fix_fn, apply_fn, _tokens = make_loop_functions(
         ctx, oracle, rules
     )
 
@@ -205,8 +205,10 @@ def test_deterministic_path_applies_substitution(tmp_path: Path) -> None:
     fix = propose_fix_fn(group, "deterministic", 0)
     assert fix != "", "deterministic fix template must be non-empty"
 
-    delta = apply_fn(fix, "fix(E01): deterministic test")
-    assert delta < 0, f"deterministic apply_fn must return negative delta, got {delta}"
+    outcome = apply_fn(fix, "fix(E01): deterministic test")
+    assert outcome.applied_ws is True, "deterministic apply_fn must report workspace touched"
+    assert outcome.commit, "apply_fn must report the commit sha"
+    assert outcome.revert is not None, "apply_fn must provide a revert callable"
 
     kernel_content = kernel_cu.read_text()
     assert "cuda_runtime.h" not in kernel_content, (
@@ -236,44 +238,12 @@ def test_full_pipeline_mock_reaches_done(tmp_path: Path) -> None:
       - Eventos 'build' en el trace con errores descendiendo.
       - Counters poblados (errors_initial, fixes_deterministic, iterations).
     """
+    # Workspace staged por el runner: contiene EXACTAMENTE lo que los
+    # fixtures bsw reportan (includes, cudaMemcpyToSymbol, __ballot_sync)
+    # + el demo-patch E05 — la convergencia es causal (audit P0.5).
+    from core.runner import _stage_mock_workspace
     repo_path = tmp_path / "repo"
-    repo_path.mkdir()
-    _init_git_repo(repo_path)
-
-    kernel_cu = repo_path / "kernel.cu"
-    kernel_cu.write_text(
-        '#include <cuda_runtime.h>\n'
-        '\n'
-        'extern "C" void kernel() {\n'
-        '  float *d;\n'
-        '  cudaMalloc(&d, 1024);\n'
-        '  cudaMemcpy(d, d, 1024, cudaMemcpyHostToDevice);\n'
-        '  cudaFree(d);\n'
-        '}\n'
-    )
-
-    main_cu = repo_path / "main.cu"
-    main_cu.write_text(
-        '#include <cuda_runtime.h>\n'
-        '#include <stdio.h>\n'
-        '\n'
-        'int main() { return 0; }\n'
-    )
-
-    kernel_wrapper_cu = repo_path / "kernel_wrapper.cu"
-    kernel_wrapper_cu.write_text(
-        '#include <cuda_runtime.h>\n'
-        '\n'
-        'void launch() {}\n'
-    )
-
-    subprocess.run(
-        ["git", "add", "-A"], cwd=str(repo_path), check=True, capture_output=True
-    )
-    subprocess.run(
-        ["git", "commit", "-m", "initial"],
-        cwd=str(repo_path), check=True, capture_output=True,
-    )
+    _stage_mock_workspace(str(repo_path), key="bsw")
 
     store = SqliteRunStore(str(tmp_path / "runs.db"))
     config = _make_config()

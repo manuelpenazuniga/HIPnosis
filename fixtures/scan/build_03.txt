@@ -1,5 +1,7 @@
 hipcc -O3 --offload-arch=gfx942 -c main.cu -o main.o
-main.cu:60:3: error: use of undeclared identifier 'hipGetDeviceProperties'; did you mean 'hipGetDeviceProperties'?
+main.cu:4:10: fatal error: 'cuda_runtime.h' file not found
+main.cu:60:3: error: use of undeclared identifier 'cudaGetDeviceProperties'
 main.cu:60:24: error: unknown type name 'cudaDeviceProp'
+main.cu:140:3: error: use of undeclared identifier 'cudaFree'
 main.cu:141:3: error: use of undeclared identifier 'cudaFree'
-3 errors generated when compiling for gfx942.
+5 errors generated when compiling for gfx942.
