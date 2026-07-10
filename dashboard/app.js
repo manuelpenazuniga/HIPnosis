@@ -38,6 +38,8 @@ const state = {
   runMeta: null,
   polling: true,
   demoMode: false,
+  apiAlive: false,
+  retryDelay: 1000,
   diffFetched: false,
   certFetched: false,
   certRaw: '',
@@ -120,8 +122,9 @@ function renderHeroMetrics() {
   const currentErrors = state.builds.length ? state.builds[state.builds.length - 1].errors : null;
 
   if (initialErrors !== null && currentErrors !== null) {
-    $('metric-errors').textContent = initialErrors;
-    $('metric-errors-sub').textContent = `→ ${currentErrors}`;
+    // "Errors Resolved" = resueltos (inicial - actuales), no el conteo inicial (audit H6).
+    $('metric-errors').textContent = initialErrors - currentErrors;
+    $('metric-errors-sub').textContent = `${initialErrors} → ${currentErrors}`;
     renderSparkline();
   }
 
@@ -418,36 +421,74 @@ function processEvents(events) {
   });
 }
 
+function setConn(kind, text) {
+  const el = $('conn');
+  const colors = {
+    live: 'text-emerald-500',
+    reconnecting: 'text-amber-400',
+    done: 'text-gray-500',
+    error: 'text-red-400',
+  };
+  el.className = `text-[10px] mt-1 text-right ${colors[kind] || 'text-gray-600'}`;
+  el.innerHTML = kind === 'live'
+    ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 pulse-dot mr-1 align-middle"></span>live'
+    : escapeHtml(text || '');
+}
+
 async function pollEvents() {
   if (!state.polling) return;
   try {
     const url = `/runs/${state.runId}/events?after=${state.lastIdx}`;
     const resp = await fetch(url);
+    if (resp.status === 404) {
+      // 404 con API viva = run desconocido: decirlo y parar. 404 sin API
+      // (dashboard servido estático, p.ej. http.server) = caso demo.
+      if (!state.apiAlive && !state.demoMode && state.events.length === 0) {
+        await loadDemoData();
+        return;
+      }
+      state.polling = false;
+      setConn('error', 'run not found');
+      const msg = $('newrun-msg');
+      msg.textContent = `Run "${state.runId}" not found — start a new port above.`;
+      msg.className = 'text-xs mt-2 px-2 text-amber-400';
+      return;
+    }
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const events = await resp.json();
+    state.retryDelay = 1000;
+    setConn('live');
     if (events.length > 0) {
       processEvents(events);
-      showApp();
     }
     if (['DONE','FAILED','DONE_PARTIAL'].includes(state.currentPhase)) {
       state.polling = false;
+      setConn('done', 'run finished');
       fetchDiff();
       fetchCertificate();
+      return;
     }
   } catch (err) {
-    if (!state.demoMode) {
+    // Audit H1: JAMÁS degradar a datos demo un run cuya API ya vimos viva.
+    // Fixtures solo como landing si la API NUNCA respondió y no hay eventos;
+    // en cualquier otro caso, reintentar con backoff y decirlo.
+    if (!state.demoMode && !state.apiAlive && state.events.length === 0) {
       await loadDemoData();
+      return;
     }
-    return;
+    setConn('reconnecting', 'connection lost — retrying…');
+    state.retryDelay = Math.min((state.retryDelay || 1000) * 2, 5000);
   }
-  if (state.polling) {
-    setTimeout(pollEvents, 1000);
-  }
+  setTimeout(pollEvents, state.retryDelay || 1000);
 }
 
 async function loadDemoData() {
   state.demoMode = true;
   state.polling = false;
+  // Honestidad (audit H1): si mostramos fixtures, decirlo — nunca hacerlos
+  // pasar por un run vivo.
+  renderModeBadge('demo');
+  setConn('done', 'demo playback — orchestrator unreachable');
   try {
     const resp = await fetch('../fixtures/demo-run.jsonl');
     if (!resp.ok) throw new Error('demo not found');
@@ -530,7 +571,42 @@ function initDownload() {
   });
 }
 
-function init() {
+function renderModeBadge(mode) {
+  const el = $('mode-badge');
+  const map = {
+    replay: { cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', label: 'REPLAY · recorded run' },
+    real:   { cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', label: 'LIVE · MI300X' },
+    mock:   { cls: 'bg-gray-500/10 text-gray-400 border-gray-500/20', label: 'MOCK' },
+    demo:   { cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', label: 'DEMO · offline fixtures' },
+  };
+  const m = map[mode];
+  if (!m) { el.classList.add('hidden'); return; }
+  el.className = `px-2 py-0.5 rounded-md text-[10px] font-bold border ${m.cls}`;
+  el.textContent = m.label;
+}
+
+async function fetchRunMeta() {
+  // Contexto del header: modo del orquestador (badge REPLAY/LIVE/MOCK) y QUÉ
+  // repo se está porteando. Fallos silenciosos: la conexión la reporta el polling.
+  try {
+    const resp = await fetch('/healthz');
+    if (resp.ok) {
+      state.apiAlive = true;
+      renderModeBadge((await resp.json()).mode);
+    }
+  } catch (e) { /* silent */ }
+  try {
+    const resp = await fetch(`/runs/${state.runId}`);
+    if (resp.ok) {
+      const run = await resp.json();
+      const el = $('run-repo');
+      el.textContent = run.repo_url || '';
+      el.title = run.repo_url || '';
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function init() {
   state.runId = getRunId();
   $('run-id').textContent = state.runId;
   initCertToggle();
@@ -540,6 +616,8 @@ function init() {
   // everything behind the spinner until the first event arrives.
   showApp();
   renderTimeline();
+  // Antes del primer poll: fija state.apiAlive (decide 404→not-found vs demo).
+  await fetchRunMeta();
   pollEvents();
 }
 

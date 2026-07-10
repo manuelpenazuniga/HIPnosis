@@ -26,10 +26,13 @@ def client() -> TestClient:
     return TestClient(create_app())
 
 
-def test_healthz_returns_ok(client: TestClient) -> None:
+def test_healthz_returns_ok_and_mode(client: TestClient) -> None:
     resp = client.get("/healthz")
     assert resp.status_code == 200
-    assert resp.json() == {"ok": True}
+    body = resp.json()
+    assert body["ok"] is True
+    # mode = oracle_mode efectivo; en tests depende del entorno, solo debe existir.
+    assert isinstance(body["mode"], str)
 
 
 def test_post_runs_creates_queued_run_with_run_prefix_id(client: TestClient) -> None:

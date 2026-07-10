@@ -4,27 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HIPnosis — Autonomous CUDA→ROCm Porting Agent</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/cpp.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/diff.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.1/marked.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            amd: '#ED1C24',
-            surface: { 900: '#0a0a0f', 800: '#111118', 700: '#1a1a24', 600: '#252530' },
-          },
-          fontFamily: { mono: ['JetBrains Mono', 'ui-monospace', 'monospace'] },
-        }
-      }
-    }
-  </script>
+  <!-- Assets 100% locales (audit H2): sin CDNs — el dashboard debe verse igual
+       sin internet (sala de demo / juez offline). Regenerar tailwind.css con
+       scripts/build-css.sh si cambian las clases usadas en index.html/app.js. -->
+  <link rel="stylesheet" href="vendor/fonts.css">
+  <link rel="stylesheet" href="vendor/tailwind.css">
+  <script src="vendor/marked.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
@@ -55,7 +41,6 @@
     .bar-animate { animation: bar-grow 0.6s ease-out forwards; transform-origin: left; }
 
     .diff-container pre { margin: 0; padding: 0; background: transparent !important; }
-    .diff-container .hljs { background: transparent !important; padding: 0 !important; }
     .diff-line { padding: 1px 12px; white-space: pre; font-size: 13px; line-height: 1.6; }
     .diff-add { background: rgba(34, 197, 94, 0.12); border-left: 3px solid #22c55e; }
     .diff-del { background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; }
@@ -117,11 +102,18 @@
           </div>
           <div class="flex items-center gap-4">
             <div class="text-right">
-              <div class="text-xs text-gray-500 uppercase tracking-wider">Run</div>
+              <div class="flex items-center justify-end gap-2">
+                <span id="mode-badge" class="hidden"></span>
+                <span class="text-xs text-gray-500 uppercase tracking-wider">Run</span>
+              </div>
               <div id="run-id" class="font-mono text-sm text-gray-300"></div>
+              <div id="run-repo" class="font-mono text-[11px] text-gray-500 max-w-[320px] truncate" title=""></div>
             </div>
-            <div id="status-badge" class="px-4 py-2 rounded-full text-sm font-bold bg-gray-700 text-gray-400">
-              INITIALIZING
+            <div class="text-right">
+              <div id="status-badge" class="px-4 py-2 rounded-full text-sm font-bold bg-gray-700 text-gray-400">
+                INITIALIZING
+              </div>
+              <div id="conn" class="text-[10px] mt-1 text-right text-gray-600"></div>
             </div>
           </div>
         </div>

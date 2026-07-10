@@ -218,5 +218,9 @@ def get_run_certificate(run_id: str, request: Request) -> dict:
 
 
 @router.get("/healthz")
-def healthz() -> dict[str, bool]:
-    return {"ok": True}
+def healthz(request: Request) -> dict:
+    """Liveness probe. ``mode`` es el oracle_mode efectivo (real|mock|replay):
+    el dashboard lo usa para el badge REPLAY/LIVE (honestidad ante el juez)."""
+    config = getattr(request.app.state, "config", None)
+    mode = getattr(config, "oracle_mode", "") if config is not None else ""
+    return {"ok": True, "mode": mode}

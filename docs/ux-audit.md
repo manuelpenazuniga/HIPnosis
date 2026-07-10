@@ -13,24 +13,24 @@ El dashboard comunica muy bien el **resultado** (burndown, verdict gigante, cert
 
 Prioridades: **P0** = puede romper el demo o mentirle al usuario · **P1** = confunde o esconde el proceso · **P2** = usabilidad/robustez · **P3** = pulido.
 
-| # | Hallazgo | Prioridad | Esfuerzo |
-|---|----------|-----------|----------|
-| 1 | Fallback silencioso a datos demo ante cualquier error de polling | P0 | 1 h |
-| 2 | Todo el estilo depende de CDNs (Tailwind, fonts) — sin internet, dashboard roto | P0 | 2–3 h |
+| # | Hallazgo | Prioridad | Estado |
+|---|----------|-----------|--------|
+| 1 | Fallback silencioso a datos demo ante cualquier error de polling | P0 | **✅ corregido (Ola 1)** |
+| 2 | Todo el estilo depende de CDNs (Tailwind, fonts) — sin internet, dashboard roto | P0 | **✅ corregido (Ola 1)** |
 | 3 | Sin forma de iniciar un run desde la UI | P0 | **✅ corregido** |
-| 4 | Sin selector/lista de runs (`GET /runs` existe y no se usa) | P1 | 1–2 h |
-| 5 | Fases tempranas mudas: QUEUED/CLONING sin feedback ni tiempo | P1 | 1–2 h |
-| 6 | Métrica "Errors Resolved" muestra errores *iniciales*, no resueltos | P1 | 15 min |
-| 7 | Costo API: precio hardcodeado en el front + badge "$0.00" fijo contradictorio | P1 | 30 min |
-| 8 | Jerga sin explicar: E01, W01, NO_ORACLE, tier, delta, "REPORTING phase" | P1 | 1–2 h |
-| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | 1–2 h |
-| 10 | Sin indicador de modo (replay/mock/real) | P2 | 1 h |
-| 11 | Sin timestamps, duración por fase, ni indicador "live" | P2 | 1–2 h |
-| 12 | Interpolación HTML sin escapar en tablas (contenido del repo objetivo) | P2 | 30 min |
-| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | 2 h |
+| 4 | Sin selector/lista de runs (`GET /runs` existe y no se usa) | P1 | pendiente (1–2 h) |
+| 5 | Fases tempranas mudas: QUEUED/CLONING sin feedback ni tiempo | P1 | **parcial (Ola 1)**: repo URL visible + 404 explícito; falta elapsed/microcopy por fase |
+| 6 | Métrica "Errors Resolved" muestra errores *iniciales*, no resueltos | P1 | **✅ corregido (Ola 1)** |
+| 7 | Costo API: precio hardcodeado en el front + badge "$0.00" fijo contradictorio | P1 | pendiente (30 min) |
+| 8 | Jerga sin explicar: E01, W01, NO_ORACLE, tier, delta, "REPORTING phase" | P1 | pendiente (1–2 h) |
+| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | pendiente (1–2 h) |
+| 10 | Sin indicador de modo (replay/mock/real) | P2 | **✅ corregido (Ola 1)** |
+| 11 | Sin timestamps, duración por fase, ni indicador "live" | P2 | **parcial (Ola 1)**: indicador live/reconnecting/finished; faltan tiempos |
+| 12 | Interpolación HTML sin escapar en tablas (contenido del repo objetivo) | P2 | pendiente (30 min) |
+| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | pendiente (2 h) |
 | 14 | Certificado colapsado por defecto siendo "the deliverable" + bug de toggle | P2 | **✅ bug corregido** |
-| 15 | highlight.js se carga y nunca se usa (peso muerto) | P3 | 5 min |
-| 16 | Sin favicon ni `<title>` dinámico con estado | P3 | 30 min |
+| 15 | highlight.js se carga y nunca se usa (peso muerto) | P3 | **✅ corregido (Ola 1)** |
+| 16 | Sin favicon ni `<title>` dinámico con estado | P3 | pendiente (30 min) |
 
 ---
 
@@ -173,11 +173,11 @@ No hay hora de inicio, duración de fases, ni timestamps en builds/fixes; tampoc
 
 ## Plan recomendado (2 días al deadline)
 
-**Ola 1 — antes del video/demo (≤ medio día):**
-1. Matar el fallback silencioso a demo (H1) — es el único que puede *mentir* en vivo.
-2. Vendorizar CDNs (H2) — es el único que puede dejar la pantalla *rota* en vivo.
-3. Fix de 15 min a "Errors Resolved" (H6) y quitar highlight.js muerto (H15).
-4. Badge de modo REPLAY/LIVE (H10) + repo URL del run en el header (parte de H5).
+**Ola 1 — antes del video/demo (≤ medio día): ✅ COMPLETADA (ver sección "Ola 1 — ejecutada")**
+1. ~~Matar el fallback silencioso a demo (H1)~~ ✅
+2. ~~Vendorizar CDNs (H2)~~ ✅
+3. ~~Fix a "Errors Resolved" (H6) y quitar highlight.js muerto (H15)~~ ✅
+4. ~~Badge de modo REPLAY/LIVE (H10) + repo URL del run en el header (parte de H5)~~ ✅
 
 **Ola 2 — antes de la submission:**
 5. Selector de runs (H4) y estado "why failed" (H9).
@@ -189,7 +189,16 @@ No hay hora de inicio, duración de fases, ni timestamps en builds/fixes; tampoc
 
 ---
 
-## Cambios ya aplicados en esta pasada (2026-07-09)
+## Ola 1 — ejecutada (2026-07-09)
+
+Todo verificado end-to-end en Chrome contra el server replay, más suite completa (370 tests verdes).
+
+1. **H1 — Polling robusto y honesto** (`app.js`): retry con backoff (1s→2s→…→5s tope) e indicador de conexión (`live` con dot verde / `connection lost — retrying…` / `run finished`). Los fixtures demo solo se cargan si la API **nunca** respondió y no llegó ningún evento (caso: dashboard servido estático), y se anuncian con badge "DEMO · offline fixtures" + "orchestrator unreachable". Un run con API viva jamás se degrada a datos falsos. `404` con API viva = mensaje "run not found" explícito (antes: silencio o datos demo). Verificado matando el server a mitad de un poll (muestra retrying, conserva el run) y sirviendo el dashboard con `http.server` puro (demo con banner).
+2. **H2/H15 — Cero CDNs** (`dashboard/vendor/`): Tailwind generado como CSS estático one-shot (`scripts/build-css.sh`, config espejo en `dashboard/tailwind.config.js` — sin build step en runtime, F-15; anotado como D-6 en DEVIATIONS.md), fuentes variables Inter + JetBrains Mono locales (woff2, ~48+40 KB), `marked.min.js` local, highlight.js eliminado (nunca se usaba). Verificado por red: la página carga con **cero requests externos**. Bonus: JetBrains Mono ahora carga de verdad (el CDN nunca la incluyó — la fuente mono declarada jamás se había servido).
+3. **H6 — Métrica corregida**: "Errors Resolved" muestra los resueltos (`inicial − actuales`) con "8 → 0" como subtítulo. Verificado en vivo (mid-run: "3", "8 → 5").
+4. **H10 + parte de H5 — Contexto en el header**: `/healthz` ahora expone `mode` (test actualizado) y la UI pinta badge REPLAY · recorded run / LIVE · MI300X / MOCK / DEMO; la **URL del repo del run** se muestra bajo el run-id (truncada, tooltip completo).
+
+## Cambios ya aplicados en la pasada inicial (2026-07-09)
 
 1. **Input "New port" en el header** (`index.html`): form con `label` accesible, placeholder con ejemplo real, botón con estado de carga (`Starting…`), mensaje de error inline si el POST falla, y microcopy de una línea explicando qué hace HIPnosis. `POST /runs` → redirect a `?run=<id>`.
 2. **Shell visible de inmediato** (`app.js` `init()`): la app ya no queda oculta tras el spinner hasta el primer evento — header, input y timeline de fases (todas pendientes) se ven desde el primer paint. El caso "API muerta y sin demo" reporta el error en el mensaje del form.
