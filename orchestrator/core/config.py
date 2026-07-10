@@ -25,6 +25,9 @@ class Config:
     # construcciones existentes de Config (aditivo, INV-8 safe).
     stagnation_force_remote: int = 3   # builds sin mejorar → forzar tier remoto
     stagnation_exit: int = 5           # builds sin mejorar → salida honesta DONE_PARTIAL
+    # Precio del tier remoto (USD por millón de tokens) para el costo del
+    # reporte/dashboard. F-17: el número se calcula acá, nunca en el frontend.
+    remote_price_per_mtok: float = 3.0
 
 
 def _getenv_str(name: str, default: str) -> str:
@@ -67,6 +70,7 @@ def get_config() -> Config:
         confidence_threshold=_getenv_float("CONFIDENCE_THRESHOLD", 0.6),
         price_h100_hr=_getenv_float("PRICE_H100_HR", 0.0),
         price_mi300x_hr=_getenv_float("PRICE_MI300X_HR", 0.0),
+        remote_price_per_mtok=_getenv_float("REMOTE_PRICE_PER_MTOK", 3.0),
     )
 
 

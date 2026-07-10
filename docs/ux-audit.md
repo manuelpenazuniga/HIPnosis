@@ -21,16 +21,16 @@ Prioridades: **P0** = puede romper el demo o mentirle al usuario · **P1** = con
 | 4 | Sin selector/lista de runs (`GET /runs` existe y no se usa) | P1 | **✅ corregido (Ola 2)** |
 | 5 | Fases tempranas mudas: QUEUED/CLONING sin feedback ni tiempo | P1 | **parcial (Ola 1)**: repo URL visible + 404 explícito; falta elapsed/microcopy por fase |
 | 6 | Métrica "Errors Resolved" muestra errores *iniciales*, no resueltos | P1 | **✅ corregido (Ola 1)** |
-| 7 | Costo API: precio hardcodeado en el front + badge "$0.00" fijo contradictorio | P1 | pendiente (30 min) |
+| 7 | Costo API: precio hardcodeado en el front + badge "$0.00" fijo contradictorio | P1 | **✅ corregido (Ola 3)** |
 | 8 | Jerga sin explicar: E01, W01, NO_ORACLE, tier, delta, "REPORTING phase" | P1 | **✅ corregido (Ola 2)** |
-| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | **parcial (Ola 2)**: paneles Why-failed y Needs-human; falta tarjeta de scan (LOC/dificultad) |
+| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | **✅ corregido (Ola 2+3)**: paneles Why-failed/Needs-human + strip de scan |
 | 10 | Sin indicador de modo (replay/mock/real) | P2 | **✅ corregido (Ola 1)** |
-| 11 | Sin timestamps, duración por fase, ni indicador "live" | P2 | **parcial (Ola 1)**: indicador live/reconnecting/finished; faltan tiempos |
+| 11 | Sin timestamps, duración por fase, ni indicador "live" | P2 | **✅ corregido (Ola 1+3)**: live/reconnecting + run time total; duración por fase queda como nice-to-have |
 | 12 | Interpolación HTML sin escapar en tablas (contenido del repo objetivo) | P2 | **✅ corregido (Ola 2)** |
-| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | **parcial (Ola 2)**: `aria-live`/`role=status` en badge, conn y verdict; faltan contraste y reduced-motion |
-| 14 | Certificado colapsado por defecto siendo "the deliverable" + bug de toggle | P2 | **✅ bug corregido** |
+| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | **✅ corregido (Ola 2+3)**: `aria-live`, contraste (gray-600→500) y `prefers-reduced-motion` |
+| 14 | Certificado colapsado por defecto siendo "the deliverable" + bug de toggle | P2 | **✅ corregido (Ola 3)**: bug de toggle + auto-expand al renderizar |
 | 15 | highlight.js se carga y nunca se usa (peso muerto) | P3 | **✅ corregido (Ola 1)** |
-| 16 | Sin favicon ni `<title>` dinámico con estado | P3 | pendiente (30 min) |
+| 16 | Sin favicon ni `<title>` dinámico con estado | P3 | **✅ corregido (Ola 3)** |
 
 ---
 
@@ -184,8 +184,22 @@ No hay hora de inicio, duración de fases, ni timestamps en builds/fixes; tampoc
 6. ~~Tooltips de jerga + placeholders humanos (H8)~~ ✅
 7. ~~Escape HTML en tablas (H12) y `aria-live` mínimo (H13)~~ ✅
 
-**Ola 3 — si sobra tiempo:**
-8. Timers/elapsed (H11), tarjeta de scan (H9b), title dinámico + favicon (H16), auto-expand del certificado en DONE (H14).
+**Ola 3 — si sobra tiempo: ✅ COMPLETADA (ver sección "Ola 3 — ejecutada")**
+8. ~~Timers/elapsed (H11), tarjeta de scan (H9b), title dinámico + favicon (H16), auto-expand del certificado en DONE (H14)~~ ✅ + H7 (costo desde backend)
+
+**Pendientes menores tras las 3 olas** (todos nice-to-have): duración por fase (resto de H11), microcopy/elapsed por fase temprana (resto de H5), sparkline con degradado rojo→verde, link al repo GitHub en el footer (bloqueado: el repo aún no es público).
+
+## Ola 3 — ejecutada (2026-07-09)
+
+Verificado end-to-end en Chrome (replay completo QUEUED→DONE) + 370 tests verdes.
+
+1. **H7 — Costo calculado en backend (F-17 de verdad)**: hallazgo adicional al implementarlo — el evento `report` que el dashboard consume **solo existía en el fixture demo**; el pipeline real nunca lo emitía. Ahora `phases/pipeline.py` emite `report` al final de REPORTING con los counters frescos del store + `cost_remote_usd` calculado con `remote_price_per_mtok` (nuevo en `config.py`, env `REMOTE_PRICE_PER_MTOK`). El front dejó de conocer precios: pinta `cost_remote_usd` (fallback: $0.00 solo si `tokens_remote === 0`, si no "—"), y la pill fija "$0.00" pasó a ser el descriptor "Fireworks · hard cases". Fixture demo actualizado con el campo.
+2. **H9 (resto) — Strip de scan**: fila compacta sobre las métricas hero con los datos del evento `scan` que se descartaban — CUDA files, kernel LOC, total de llamadas API CUDA, build system, dificultad (coloreada easy/medium/hard) y GPU target (de `run_meta`).
+3. **H11 (resto) — Run time**: "run time 37s" bajo el indicador de conexión, calculado de los timestamps del trace (en replay muestra la duración *grabada*, no la del playback — honesto).
+4. **H16 — Favicon + title dinámico**: favicon SVG inline (data URI, sin request) y `document.title` = "HIPnosis · BUILD LOOP/DONE/…" — el estado se ve desde el tab.
+5. **H14 (resto) — Certificado auto-expandido**: al renderizarse llega abierto con label "Collapse certificate" (es el deliverable, no un acordeón).
+6. **H13 (resto)**: `prefers-reduced-motion` (mata animaciones/transiciones) y sweep de contraste `text-gray-600` → `text-gray-500`.
+7. **P3 — Pacing del drip demo**: pausas por tipo de evento (build 500 ms, phase 350 ms, resto 100 ms) — la reproducción estática respira como un run real.
 
 ---
 

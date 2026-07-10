@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HIPnosis — Autonomous CUDA→ROCm Porting Agent</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ED1C24'/%3E%3Ctext x='32' y='45' font-size='38' font-weight='800' font-family='Arial,sans-serif' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
   <!-- Assets 100% locales (audit H2): sin CDNs — el dashboard debe verse igual
        sin internet (sala de demo / juez offline). Regenerar tailwind.css con
        scripts/build-css.sh si cambian las clases usadas en index.html/app.js. -->
@@ -76,6 +77,15 @@
 
     .section-reveal { opacity: 0; }
     .section-reveal.visible { opacity: 1; animation: slide-up 0.5s ease-out forwards; }
+
+    /* Audit H13: respetar la preferencia de movimiento reducido del sistema. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-surface-900 text-gray-100 min-h-screen">
@@ -115,7 +125,8 @@
               <div id="status-badge" role="status" aria-live="polite" class="px-4 py-2 rounded-full text-sm font-bold bg-gray-700 text-gray-400">
                 INITIALIZING
               </div>
-              <div id="conn" role="status" class="text-[10px] mt-1 text-right text-gray-600"></div>
+              <div id="conn" role="status" class="text-[10px] mt-1 text-right text-gray-500"></div>
+              <div id="elapsed" class="text-[10px] mt-0.5 text-right text-gray-500"></div>
             </div>
           </div>
         </div>
@@ -132,8 +143,10 @@
             </button>
           </form>
           <p id="newrun-msg" class="hidden text-xs mt-2 px-2"></p>
-          <p class="text-xs text-gray-600 mt-2 px-2">Paste a CUDA repo URL — HIPnosis clones it, ports it to HIP, drains build errors and verifies numerical parity on AMD.</p>
+          <p class="text-xs text-gray-500 mt-2 px-2">Paste a CUDA repo URL — HIPnosis clones it, ports it to HIP, drains build errors and verifies numerical parity on AMD.</p>
         </div>
+
+        <div id="scan-strip" class="hidden glass rounded-2xl px-5 py-3 mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400"></div>
 
         <div id="hero-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
@@ -161,7 +174,7 @@
           <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Cloud API Cost</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">$0.00</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">Fireworks · hard cases</span>
             </div>
             <div class="flex items-end gap-2">
               <span id="metric-cost" class="text-4xl font-black text-green-400 animate-count">$0</span>
@@ -214,7 +227,7 @@
           <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
             <div>
               <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Code Transformation</h2>
-              <p class="text-xs text-gray-600 mt-0.5">CUDA → HIP — the real diff</p>
+              <p class="text-xs text-gray-500 mt-0.5">CUDA → HIP — the real diff</p>
             </div>
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-red-500"></span>
@@ -224,7 +237,7 @@
             </div>
           </div>
           <div id="diff-container" class="diff-container overflow-x-auto max-h-[500px] p-4 font-mono text-sm bg-[#0d1117]">
-            <p class="text-gray-600 text-center py-8">The CUDA → HIP diff appears once porting completes.</p>
+            <p class="text-gray-500 text-center py-8">The CUDA → HIP diff appears once porting completes.</p>
           </div>
         </div>
       </section>
@@ -270,7 +283,7 @@
           <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
             <div>
               <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Port Certificate</h2>
-              <p class="text-xs text-gray-600 mt-0.5">The deliverable</p>
+              <p class="text-xs text-gray-500 mt-0.5">The deliverable</p>
             </div>
             <button id="cert-download-btn" class="hidden px-3 py-1.5 rounded-lg bg-amd/10 text-amd text-xs font-semibold hover:bg-amd/20 transition-colors border border-amd/20">
               Download .md
@@ -284,7 +297,7 @@
         </div>
       </section>
 
-      <footer class="text-center py-8 text-xs text-gray-600">
+      <footer class="text-center py-8 text-xs text-gray-500">
         HIPnosis · AMD Developer Hackathon ACT II · Track 3 Unicorn + Gemma Prize
       </footer>
     </div>

@@ -56,6 +56,26 @@ def run_full_pipeline(
 
     def _report(ctx) -> None:
         ship_handler(ctx)
+        # Evento 'report': el resumen numérico que consume el dashboard.
+        # Hasta ahora solo existía en el fixture demo — el pipeline real no lo
+        # emitía. Números desde counters del store + costo calculado acá (F-17).
+        fresh = store.get(run_id)
+        if fresh is not None:
+            c = fresh.counters
+            trace.emit(
+                "report",
+                errors_initial=c.errors_initial,
+                errors_current=c.errors_current,
+                fixes_deterministic=c.fixes_deterministic,
+                fixes_local=c.fixes_local,
+                fixes_remote=c.fixes_remote,
+                tokens_local=c.tokens_local,
+                tokens_remote=c.tokens_remote,
+                iterations=c.iterations,
+                cost_remote_usd=round(
+                    c.tokens_remote / 1_000_000 * config.remote_price_per_mtok, 4
+                ),
+            )
 
     overrides = {
         RunState.BUILD_LOOP: _loop,

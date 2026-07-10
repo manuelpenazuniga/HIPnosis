@@ -70,6 +70,9 @@ const state = {
   report: null,
   failed: null,
   loopDone: null,
+  firstTs: null,
+  lastTs: null,
+  certOpen: false,
   scan: null,
   runMeta: null,
   polling: true,
@@ -118,6 +121,36 @@ function updateStatusBadge(phase) {
   const m = map[phase] || map.QUEUED;
   badge.className = `px-4 py-2 rounded-full text-sm font-bold ${m.cls}`;
   badge.textContent = m.label;
+  document.title = `HIPnosis · ${m.label}`;
+}
+
+function renderScanStrip() {
+  // H9: el contexto del repo (evento scan + run_meta) — antes se descartaba.
+  const el = $('scan-strip');
+  const s = state.scan;
+  if (!s) return;
+  const apiCalls = s.api_calls ? Object.values(s.api_calls).reduce((a, b) => a + b, 0) : null;
+  const diffCls = { easy: 'text-emerald-400', medium: 'text-amber-400', hard: 'text-red-400' }[s.difficulty] || 'text-gray-300';
+  const item = (label, value, valueCls = 'text-gray-200') =>
+    `<span class="flex items-baseline gap-1.5"><span class="text-[10px] uppercase tracking-wider text-gray-500">${label}</span><span class="font-mono text-sm font-semibold ${valueCls}">${escapeHtml(String(value))}</span></span>`;
+  let html = '';
+  if (s.files_cuda != null) html += item('CUDA files', s.files_cuda);
+  if (s.loc_kernels != null) html += item('Kernel LOC', s.loc_kernels);
+  if (apiCalls != null) html += item('CUDA API calls', apiCalls);
+  if (s.build_system) html += item('Build', s.build_system);
+  if (s.difficulty) html += item('Difficulty', s.difficulty, diffCls);
+  if (state.runMeta && state.runMeta.gpu_arch) html += item('Target GPU', state.runMeta.gpu_arch, 'text-amd');
+  el.innerHTML = html;
+  el.classList.remove('hidden');
+}
+
+function renderElapsed() {
+  // H11: duración del run según los timestamps del trace (honesto en replay:
+  // muestra la duración GRABADA, no la del playback).
+  if (!state.firstTs || !state.lastTs) return;
+  const secs = Math.max(0, Math.round((state.lastTs - state.firstTs) / 1000));
+  const text = secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+  $('elapsed').textContent = `run time ${text}`;
 }
 
 function renderTimeline() {
@@ -170,8 +203,11 @@ function renderHeroMetrics() {
     const pct = totalFixes > 0 ? Math.round((localFixes / totalFixes) * 100) : 0;
     $('metric-local').textContent = pct;
 
-    const costEstimate = (r.tokens_remote * 0.000003).toFixed(2);
-    $('metric-cost').textContent = `$${costEstimate}`;
+    // H7/F-17: el costo viene CALCULADO del backend (evento report). El front
+    // no conoce precios; sin el campo, solo el caso trivial 0 tokens = $0.
+    const cost = (typeof r.cost_remote_usd === 'number') ? r.cost_remote_usd
+               : (r.tokens_remote === 0 ? 0 : null);
+    $('metric-cost').textContent = cost === null ? '—' : `$${cost.toFixed(2)}`;
 
     $('metric-wave64').textContent = r.wave64_findings || state.wave64.length;
   } else {
@@ -406,6 +442,9 @@ function renderCertificate(md) {
 
   toggle.classList.remove('hidden');
   downloadBtn.classList.remove('hidden');
+  // H14: el certificado es "the deliverable" — llega expandido, no escondido.
+  state.certOpen = true;
+  applyCertToggle();
   revealSection('certificate-section');
 }
 
@@ -450,9 +489,11 @@ function processEvent(ev) {
       break;
     case 'run_meta':
       state.runMeta = ev;
+      renderScanStrip();
       break;
     case 'scan':
       state.scan = ev;
+      renderScanStrip();
       break;
     case 'wave64':
       state.wave64.push({ file: ev.file, line: ev.line, pattern: ev.pattern });
@@ -498,9 +539,17 @@ function processEvents(events) {
     if (ev._i > state.lastIdx) {
       state.lastIdx = ev._i;
       state.events.push(ev);
+      if (ev.ts) {
+        const t = Date.parse(ev.ts);
+        if (!Number.isNaN(t)) {
+          if (!state.firstTs) state.firstTs = t;
+          state.lastTs = t;
+        }
+      }
       processEvent(ev);
     }
   });
+  renderElapsed();
 }
 
 function setConn(kind, text) {
@@ -582,10 +631,12 @@ async function loadDemoData() {
       return ev;
     });
     showApp();
+    // Pausas por tipo de evento: la reproducción respira como un run real
+    // (compilar tarda; clasificar es instantáneo).
+    const pacing = { phase: 350, build: 500, verify: 400 };
     for (let i = 0; i < events.length; i++) {
-      processEvent(events[i]);
-      state.lastIdx = i;
-      await new Promise(r => setTimeout(r, 120));
+      processEvents([events[i]]);
+      await new Promise(r => setTimeout(r, pacing[events[i].ev] || 100));
     }
     fetchDiff();
     fetchCertificate();
@@ -596,17 +647,17 @@ async function loadDemoData() {
   }
 }
 
+function applyCertToggle() {
+  const open = state.certOpen;
+  $('cert-content').classList.toggle('hidden', !open);
+  $('cert-chevron').style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+  $('cert-toggle').querySelector('span').textContent = open ? 'Collapse certificate' : 'Expand certificate';
+}
+
 function initCertToggle() {
-  const toggle = $('cert-toggle');
-  const content = $('cert-content');
-  const chevron = $('cert-chevron');
-  const label = toggle.querySelector('span');
-  let open = false;
-  toggle.addEventListener('click', () => {
-    open = !open;
-    content.classList.toggle('hidden', !open);
-    chevron.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
-    label.textContent = open ? 'Collapse certificate' : 'Expand certificate';
+  $('cert-toggle').addEventListener('click', () => {
+    state.certOpen = !state.certOpen;
+    applyCertToggle();
   });
 }
 
