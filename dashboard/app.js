@@ -467,7 +467,9 @@ async function loadDemoData() {
     fetchDiff();
     fetchCertificate();
   } catch (err) {
-    $('loading-screen').innerHTML = '<p class="text-gray-500 text-center">Could not connect to API or load demo data.</p>';
+    const msg = $('newrun-msg');
+    msg.textContent = 'Could not connect to the API or load demo data.';
+    msg.className = 'text-xs mt-2 px-2 text-red-400';
   }
 }
 
@@ -475,11 +477,43 @@ function initCertToggle() {
   const toggle = $('cert-toggle');
   const content = $('cert-content');
   const chevron = $('cert-chevron');
-  let open = true;
+  const label = toggle.querySelector('span');
+  let open = false;
   toggle.addEventListener('click', () => {
     open = !open;
     content.classList.toggle('hidden', !open);
     chevron.style.transform = open ? 'rotate(180deg)' : 'rotate(0deg)';
+    label.textContent = open ? 'Collapse certificate' : 'Expand certificate';
+  });
+}
+
+function initNewRun() {
+  const form = $('newrun-form');
+  const input = $('newrun-url');
+  const btn = $('newrun-btn');
+  const msg = $('newrun-msg');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const repoUrl = input.value.trim();
+    if (!repoUrl) return;
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    msg.classList.add('hidden');
+    try {
+      const resp = await fetch('/runs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_url: repoUrl }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const run = await resp.json();
+      window.location.search = `?run=${encodeURIComponent(run.id)}`;
+    } catch (err) {
+      msg.textContent = `Could not start the run (${err.message}). Is the orchestrator up?`;
+      msg.className = 'text-xs mt-2 px-2 text-red-400';
+      btn.disabled = false;
+      btn.textContent = 'Port it →';
+    }
   });
 }
 
@@ -501,6 +535,11 @@ function init() {
   $('run-id').textContent = state.runId;
   initCertToggle();
   initDownload();
+  initNewRun();
+  // Show the shell right away (input + phases pending) instead of blocking
+  // everything behind the spinner until the first event arrives.
+  showApp();
+  renderTimeline();
   pollEvents();
 }
 

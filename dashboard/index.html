@@ -126,6 +126,21 @@
           </div>
         </div>
 
+        <div class="mb-6">
+          <form id="newrun-form" class="glass rounded-2xl p-2 pl-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <label for="newrun-url" class="text-xs font-semibold uppercase tracking-wider text-gray-500 whitespace-nowrap py-2 sm:py-0">New port</label>
+            <input id="newrun-url" type="url" required
+              placeholder="https://github.com/you/your-cuda-repo"
+              class="flex-1 min-w-0 bg-surface-700 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-mono text-gray-200 placeholder-gray-600 focus:outline-none focus:border-amd/60 focus:ring-1 focus:ring-amd/40 transition-colors" />
+            <button type="submit" id="newrun-btn"
+              class="px-5 py-2.5 rounded-xl bg-amd text-white text-sm font-bold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-wait whitespace-nowrap">
+              Port it →
+            </button>
+          </form>
+          <p id="newrun-msg" class="hidden text-xs mt-2 px-2"></p>
+          <p class="text-xs text-gray-600 mt-2 px-2">Paste a CUDA repo URL — HIPnosis clones it, ports it to HIP, drains build errors and verifies numerical parity on AMD.</p>
+        </div>
+
         <div id="hero-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
             <div class="flex items-center justify-between mb-3">
