@@ -9,6 +9,9 @@ venv/
 !.env.example
 # OS
 .DS_Store
+
+# Docs (brainstorm, workflow interno, auditorías) — no forman parte de la entrega
+docs/
 # Workspaces del pipeline (repos objetivo por run)
 workspaces/
 # Bus efímero del orquestador
