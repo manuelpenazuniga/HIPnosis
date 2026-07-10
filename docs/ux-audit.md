@@ -18,16 +18,16 @@ Prioridades: **P0** = puede romper el demo o mentirle al usuario · **P1** = con
 | 1 | Fallback silencioso a datos demo ante cualquier error de polling | P0 | **✅ corregido (Ola 1)** |
 | 2 | Todo el estilo depende de CDNs (Tailwind, fonts) — sin internet, dashboard roto | P0 | **✅ corregido (Ola 1)** |
 | 3 | Sin forma de iniciar un run desde la UI | P0 | **✅ corregido** |
-| 4 | Sin selector/lista de runs (`GET /runs` existe y no se usa) | P1 | pendiente (1–2 h) |
+| 4 | Sin selector/lista de runs (`GET /runs` existe y no se usa) | P1 | **✅ corregido (Ola 2)** |
 | 5 | Fases tempranas mudas: QUEUED/CLONING sin feedback ni tiempo | P1 | **parcial (Ola 1)**: repo URL visible + 404 explícito; falta elapsed/microcopy por fase |
 | 6 | Métrica "Errors Resolved" muestra errores *iniciales*, no resueltos | P1 | **✅ corregido (Ola 1)** |
 | 7 | Costo API: precio hardcodeado en el front + badge "$0.00" fijo contradictorio | P1 | pendiente (30 min) |
-| 8 | Jerga sin explicar: E01, W01, NO_ORACLE, tier, delta, "REPORTING phase" | P1 | pendiente (1–2 h) |
-| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | pendiente (1–2 h) |
+| 8 | Jerga sin explicar: E01, W01, NO_ORACLE, tier, delta, "REPORTING phase" | P1 | **✅ corregido (Ola 2)** |
+| 9 | FAILED no muestra causa; eventos `scan`/`run_meta` se descartan | P1 | **parcial (Ola 2)**: paneles Why-failed y Needs-human; falta tarjeta de scan (LOC/dificultad) |
 | 10 | Sin indicador de modo (replay/mock/real) | P2 | **✅ corregido (Ola 1)** |
 | 11 | Sin timestamps, duración por fase, ni indicador "live" | P2 | **parcial (Ola 1)**: indicador live/reconnecting/finished; faltan tiempos |
-| 12 | Interpolación HTML sin escapar en tablas (contenido del repo objetivo) | P2 | pendiente (30 min) |
-| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | pendiente (2 h) |
+| 12 | Interpolación HTML sin escapar en tablas (contenido del repo objetivo) | P2 | **✅ corregido (Ola 2)** |
+| 13 | Accesibilidad: severidad solo por color, sin `aria-live`, sin reduced-motion | P2 | **parcial (Ola 2)**: `aria-live`/`role=status` en badge, conn y verdict; faltan contraste y reduced-motion |
 | 14 | Certificado colapsado por defecto siendo "the deliverable" + bug de toggle | P2 | **✅ bug corregido** |
 | 15 | highlight.js se carga y nunca se usa (peso muerto) | P3 | **✅ corregido (Ola 1)** |
 | 16 | Sin favicon ni `<title>` dinámico con estado | P3 | pendiente (30 min) |
@@ -179,10 +179,10 @@ No hay hora de inicio, duración de fases, ni timestamps en builds/fixes; tampoc
 3. ~~Fix a "Errors Resolved" (H6) y quitar highlight.js muerto (H15)~~ ✅
 4. ~~Badge de modo REPLAY/LIVE (H10) + repo URL del run en el header (parte de H5)~~ ✅
 
-**Ola 2 — antes de la submission:**
-5. Selector de runs (H4) y estado "why failed" (H9).
-6. Tooltips de jerga + placeholders humanos (H8).
-7. Escape HTML en tablas (H12) y `aria-live` mínimo (H13).
+**Ola 2 — antes de la submission: ✅ COMPLETADA (ver sección "Ola 2 — ejecutada")**
+5. ~~Selector de runs (H4) y estado "why failed" (H9)~~ ✅
+6. ~~Tooltips de jerga + placeholders humanos (H8)~~ ✅
+7. ~~Escape HTML en tablas (H12) y `aria-live` mínimo (H13)~~ ✅
 
 **Ola 3 — si sobra tiempo:**
 8. Timers/elapsed (H11), tarjeta de scan (H9b), title dinámico + favicon (H16), auto-expand del certificado en DONE (H14).
@@ -197,6 +197,17 @@ Todo verificado end-to-end en Chrome contra el server replay, más suite complet
 2. **H2/H15 — Cero CDNs** (`dashboard/vendor/`): Tailwind generado como CSS estático one-shot (`scripts/build-css.sh`, config espejo en `dashboard/tailwind.config.js` — sin build step en runtime, F-15; anotado como D-6 en DEVIATIONS.md), fuentes variables Inter + JetBrains Mono locales (woff2, ~48+40 KB), `marked.min.js` local, highlight.js eliminado (nunca se usaba). Verificado por red: la página carga con **cero requests externos**. Bonus: JetBrains Mono ahora carga de verdad (el CDN nunca la incluyó — la fuente mono declarada jamás se había servido).
 3. **H6 — Métrica corregida**: "Errors Resolved" muestra los resueltos (`inicial − actuales`) con "8 → 0" como subtítulo. Verificado en vivo (mid-run: "3", "8 → 5").
 4. **H10 + parte de H5 — Contexto en el header**: `/healthz` ahora expone `mode` (test actualizado) y la UI pinta badge REPLAY · recorded run / LIVE · MI300X / MOCK / DEMO; la **URL del repo del run** se muestra bajo el run-id (truncada, tooltip completo).
+
+## Ola 2 — ejecutada (2026-07-09)
+
+Verificado end-to-end en Chrome contra el server replay (selector con 2 runs y navegación real; paneles de outcome ejercitados inyectando eventos `failed` y `build_loop.done` reales por consola; tooltips confirmados por atributo).
+
+1. **H4 — Selector de runs**: `<select>` nativo en el header (accesible, cero dependencias) poblado de `GET /runs` con `id · estado`; al cambiar navega a `?run=<id>`. Si la lista no carga, queda el run-id plano como fallback.
+2. **H9 (parcial) — La causa del final no-verde, visible**: nueva sección de outcome que consume dos eventos del trace que la UI descartaba: `failed` (`reason` + `exc_type`, panel rojo "Why this run failed") y `build_loop.done.needs_human` (panel ámbar "Needs human attention" con las firmas no resueltas — el espejo en UI de la degradación honesta del blueprint). Pendiente de H9: tarjeta con los datos de `scan` (LOC/dificultad).
+3. **H8 — Decoder de jerga**: tooltips (`title` + `cursor-help`) en toda la jerga: clases E01–E99 (espejo de `core/rules.yaml`), patrones W01–W07 (espejo de las explicaciones F-17 de `core/wave64.py`), tiers deterministic/local/remote, columna "Delta" → "Δ errors" con explicación. `NO_ORACLE` siempre lleva subtítulo explicativo. Placeholder del diff humanizado ("The CUDA → HIP diff appears once porting completes"). Solo texto fijo descriptivo — los números siguen saliendo del backend (F-17).
+4. **H12 — Escape HTML**: todo lo interpolado en tablas y paneles (paths de archivo, firmas, clases, commits — contenido que viene del repo objetivo) pasa por `escapeHtml()`.
+5. **H13 (parcial) — `aria-live="polite"`/`role="status"`** en status badge, indicador de conexión y verdict; el selector tiene `aria-label`. Pendiente: contraste de grises y `prefers-reduced-motion`.
+6. Bonus: la tabla de fixes usa `klass` directo del evento `fix` (antes solo el lookup por firma del evento `classify`).
 
 ## Cambios ya aplicados en la pasada inicial (2026-07-09)
 

@@ -23,6 +23,40 @@ const WAVE64_SEV = {
   W07: { label: 'Suspicious',  color: 'amber' },
 };
 
+// Decoder de jerga (audit H8): etiquetas fijas para tooltips, espejo de
+// core/rules.yaml y core/wave64.py. Solo TEXTO descriptivo — los números
+// siguen saliendo únicamente del backend (F-17).
+const CLASS_NAMES = {
+  E01: 'Leftover CUDA include (<cuda_runtime.h> not translated)',
+  E02: 'Unconverted CUDA API call',
+  E03: 'Unconverted CUDA type or handle',
+  E04: 'Inline PTX assembly (NVIDIA-only)',
+  E05: 'Warp intrinsic mismatch (32 vs 64 lanes)',
+  E06: 'Texture / surface API',
+  E07: 'Kernel launch syntax (<<<...>>>)',
+  E08: 'Undefined symbol at link time',
+  E09: 'HIP include not found',
+  E10: 'Symbol / memcpy issue',
+  E11: 'External library mismatch (cuBLAS, cuFFT, …)',
+  E12: 'Wave64 runtime issue',
+  E13: 'Build system (Makefile flags, nvcc remnants)',
+  E99: 'Unknown — unclassified error',
+};
+const WAVE64_EXPL = {
+  W01: '32-bit mask — on wave64 the mask/result are 64-bit',
+  W02: 'Ballot result truncated to 32 bits on wave64',
+  W03: 'Needs __popcll over a 64-bit mask',
+  W04: 'Hardcoded width 32 — AMD wavefront is 64',
+  W05: 'Lane arithmetic assumes a 32-wide warp (&31, >>5)',
+  W06: 'Cooperative-groups partition of NVIDIA warp size',
+  W07: 'warpSize must be queried at runtime in HIP, not fixed at 32',
+};
+const TIER_EXPL = {
+  deterministic: 'Fixed by the rule table — no LLM involved',
+  local: 'Fixed by Gemma 3 27B running locally on the MI300X ($0 API)',
+  remote: 'Fixed by the cloud LLM (Fireworks) — hard cases only',
+};
+
 const state = {
   runId: '',
   events: [],
@@ -34,6 +68,8 @@ const state = {
   classifies: {},
   verify: null,
   report: null,
+  failed: null,
+  loopDone: null,
   scan: null,
   runMeta: null,
   polling: true,
@@ -180,10 +216,11 @@ function renderWave64() {
                    sev.color === 'amber' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                    'bg-gray-500/10 text-gray-400 border-gray-500/20';
     const patCls = 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
+    const expl = WAVE64_EXPL[w.pattern] || '';
     html += `<tr class="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-      <td class="py-2.5 px-3 font-mono text-gray-300">${w.file}</td>
-      <td class="py-2.5 px-3 font-mono text-gray-400">${w.line}</td>
-      <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-bold border ${patCls}">${w.pattern}</span></td>
+      <td class="py-2.5 px-3 font-mono text-gray-300">${escapeHtml(String(w.file))}</td>
+      <td class="py-2.5 px-3 font-mono text-gray-400">${escapeHtml(String(w.line))}</td>
+      <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-bold border cursor-help ${patCls}" title="${escapeHtml(expl)}">${escapeHtml(String(w.pattern))}</span></td>
       <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-md text-xs font-semibold border ${sevCls}">${sev.label}</span></td>
     </tr>`;
   });
@@ -258,7 +295,8 @@ function renderFixes() {
       local:         'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       remote:        'bg-blue-500/10 text-blue-400 border-blue-500/20',
     };
-    return `<span class="px-2 py-0.5 rounded-md text-xs font-semibold border ${map[tier] || map.deterministic}">${tier}</span>`;
+    const expl = TIER_EXPL[tier] || '';
+    return `<span class="px-2 py-0.5 rounded-md text-xs font-semibold border cursor-help ${map[tier] || map.deterministic}" title="${escapeHtml(expl)}">${escapeHtml(String(tier))}</span>`;
   };
 
   countersEl.innerHTML = `
@@ -281,17 +319,18 @@ function renderFixes() {
       <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
       <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Tier</th>
       <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Commit</th>
-      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Delta</th>
+      <th class="py-2 px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right cursor-help" title="Change in compiler error count after this fix (negative = errors removed)">Δ errors</th>
     </tr></thead><tbody>`;
   state.fixes.forEach(f => {
-    const klass = state.classifies[f.sig]?.klass || '?';
+    const klass = f.klass || state.classifies[f.sig]?.klass || '?';
+    const klassExpl = CLASS_NAMES[klass] || '';
     const commitShort = f.commit ? f.commit.substring(0, 7) : '—';
     const deltaColor = f.delta <= 0 ? 'text-emerald-400' : 'text-red-400';
     html += `<tr class="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-      <td class="py-2.5 px-3 font-mono text-gray-300">${klass}</td>
+      <td class="py-2.5 px-3 font-mono text-gray-300 cursor-help" title="${escapeHtml(klassExpl)}">${escapeHtml(String(klass))}</td>
       <td class="py-2.5 px-3">${tierBadge(f.tier)}</td>
-      <td class="py-2.5 px-3 font-mono text-xs text-gray-500">${commitShort}</td>
-      <td class="py-2.5 px-3 font-mono text-xs text-right ${deltaColor}">${f.delta > 0 ? '+' : ''}${f.delta}</td>
+      <td class="py-2.5 px-3 font-mono text-xs text-gray-500">${escapeHtml(String(commitShort))}</td>
+      <td class="py-2.5 px-3 font-mono text-xs text-right ${deltaColor}">${f.delta > 0 ? '+' : ''}${escapeHtml(String(f.delta))}</td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -313,8 +352,43 @@ function renderVerdict() {
   el.className = `text-7xl sm:text-8xl font-black py-4 ${m.cls}`;
   el.style.filter = m.glow;
   el.textContent = state.verify.verdict;
-  detail.textContent = state.verify.detail || '';
+  let detailText = state.verify.detail || '';
+  if (state.verify.verdict === 'NO_ORACLE') {
+    // H8: NO_ORACLE es jerga interna — explicarla siempre.
+    const expl = 'No test oracle available for this repo — the build was verified, numerical parity could not be checked.';
+    detailText = detailText ? `${expl} (${detailText})` : expl;
+  }
+  detail.textContent = detailText;
   revealSection('verdict-section');
+}
+
+function renderOutcome() {
+  // H9: la causa de un final no-verde, visible — no enterrada en el trace.
+  const card = $('outcome-card');
+  const needsHuman = state.loopDone && Array.isArray(state.loopDone.needs_human)
+    ? state.loopDone.needs_human : [];
+
+  if (state.failed) {
+    $('outcome-section').classList.remove('hidden');
+    card.className = 'glass rounded-2xl p-6 border-l-4 border-l-red-500';
+    card.innerHTML = `
+      <h2 class="text-lg font-bold text-red-400 mb-2">Why this run failed</h2>
+      <p class="text-sm text-gray-300 leading-relaxed font-mono">${escapeHtml(state.failed.reason || 'unknown error')}</p>
+      <p class="text-xs text-gray-500 mt-2">${escapeHtml(state.failed.exc_type || '')} — full detail in the run trace.</p>`;
+    revealSection('outcome-section');
+    return;
+  }
+  if (needsHuman.length > 0) {
+    $('outcome-section').classList.remove('hidden');
+    const items = needsHuman.map(s =>
+      `<li class="font-mono text-xs text-gray-300 py-1 px-2 bg-white/[0.03] rounded-md">${escapeHtml(String(s))}</li>`).join('');
+    card.className = 'glass rounded-2xl p-6 border-l-4 border-l-amber-500';
+    card.innerHTML = `
+      <h2 class="text-lg font-bold text-amber-300 mb-1">Needs human attention</h2>
+      <p class="text-sm text-gray-400 mb-3">HIPnosis could not resolve ${needsHuman.length === 1 ? 'this error group' : `these ${needsHuman.length} error groups`} automatically — they are listed honestly in the certificate instead of being hidden.</p>
+      <ul class="space-y-1">${items}</ul>`;
+    revealSection('outcome-section');
+  }
 }
 
 function renderCertificate(md) {
@@ -394,8 +468,16 @@ function processEvent(ev) {
       state.classifies[ev.sig] = { klass: ev.klass, tier: ev.tier, confidence: ev.confidence };
       break;
     case 'fix':
-      state.fixes.push({ sig: ev.sig, tier: ev.tier, applied: ev.applied, delta: ev.delta, commit: ev.commit, tokens: ev.tokens });
+      state.fixes.push({ sig: ev.sig, klass: ev.klass, tier: ev.tier, applied: ev.applied, delta: ev.delta, commit: ev.commit, tokens: ev.tokens });
       renderFixes();
+      break;
+    case 'failed':
+      state.failed = { reason: ev.reason, exc_type: ev.exc_type };
+      renderOutcome();
+      break;
+    case 'build_loop.done':
+      state.loopDone = ev;
+      renderOutcome();
       break;
     case 'verify':
       state.verify = { verdict: ev.verdict, detail: ev.detail };
@@ -585,6 +667,26 @@ function renderModeBadge(mode) {
   el.textContent = m.label;
 }
 
+async function fetchRunList() {
+  // H4: navegación entre runs — GET /runs existía y la UI no lo usaba.
+  try {
+    const resp = await fetch('/runs');
+    if (!resp.ok) return;
+    const runs = await resp.json();
+    if (!Array.isArray(runs) || runs.length === 0) return;
+    const sel = $('run-select');
+    let html = runs.map(r =>
+      `<option value="${escapeHtml(r.id)}"${r.id === state.runId ? ' selected' : ''}>${escapeHtml(r.id)} · ${escapeHtml(r.state)}</option>`
+    ).join('');
+    if (!runs.some(r => r.id === state.runId)) {
+      html = `<option value="${escapeHtml(state.runId)}" selected>${escapeHtml(state.runId)}</option>` + html;
+    }
+    sel.innerHTML = html;
+    sel.classList.remove('hidden');
+    $('run-id').classList.add('hidden');
+  } catch (e) { /* silent — sin lista, queda el run-id plano */ }
+}
+
 async function fetchRunMeta() {
   // Contexto del header: modo del orquestador (badge REPLAY/LIVE/MOCK) y QUÉ
   // repo se está porteando. Fallos silenciosos: la conexión la reporta el polling.
@@ -612,12 +714,18 @@ async function init() {
   initCertToggle();
   initDownload();
   initNewRun();
+  $('run-select').addEventListener('change', (e) => {
+    if (e.target.value && e.target.value !== state.runId) {
+      window.location.search = `?run=${encodeURIComponent(e.target.value)}`;
+    }
+  });
   // Show the shell right away (input + phases pending) instead of blocking
   // everything behind the spinner until the first event arrives.
   showApp();
   renderTimeline();
   // Antes del primer poll: fija state.apiAlive (decide 404→not-found vs demo).
   await fetchRunMeta();
+  fetchRunList();
   pollEvents();
 }
 
