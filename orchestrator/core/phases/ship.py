@@ -574,6 +574,43 @@ def ship_handler(ctx: Any) -> None:
     ctx.certificate_path = result["certificate_path"]
     ctx.ship_result = result
 
+    # --- Port Passport: atestación de procedencia verificable (wow #2) -----
+    # Digests SHA-256 del diff y del certificado (F-17: hashes por código).
+    try:
+        from core.attestation import (  # noqa: PLC0415
+            build_attestation,
+            workspace_diff,
+            write_attestation,
+        )
+
+        with open(result["certificate_path"], encoding="utf-8") as _cf:
+            cert_text = _cf.read()
+
+        manifest = getattr(ctx, "manifest", None)
+        rtol = getattr(getattr(manifest, "verify", None), "numeric_rtol", None)
+        atol = getattr(getattr(manifest, "verify", None), "numeric_atol", None)
+
+        att = build_attestation(
+            repo_url=run.repo_url,
+            repo_dir=repo_dir,
+            oracle_mode=config.oracle_mode,
+            gpu_arch=config.gpu_arch,
+            verdict=report_data.verify_verdict,
+            counters=run.counters,
+            wave64_findings=len(report_data.wave64_findings),
+            rtol=rtol,
+            atol=atol,
+            certificate_text=cert_text,
+            diff_text=workspace_diff(repo_dir),
+        )
+        att_path = write_attestation(att, repo_dir)
+        ctx.attestation_path = att_path
+        if trace is not None:
+            trace.emit("ship.attestation", path=att_path,
+                       diff_digest=att["predicate"]["materials"]["diff"]["digest"])
+    except Exception:  # noqa: BLE001 — INV-5: el passport es azúcar, nunca tumba el run
+        pass
+
 
 __all__ = [
     "CERTIFICATE_FILENAME",

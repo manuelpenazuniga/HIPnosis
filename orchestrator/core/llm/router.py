@@ -37,7 +37,10 @@ def decide_tier(
     """
     if strategy == _TIER_DETERMINISTIC:
         return _TIER_DETERMINISTIC
-    if attempts == 0 and tier_sugerido == _TIER_LOCAL:
+    # Primer intento: probar el tier local (Gemma, $0 API) cuando la clase lo
+    # sugiere — incluye 'local_then_remote' (E99), que antes saltaba directo a
+    # remoto en el primer intento (audit codex P1). Reintentos → remoto.
+    if attempts == 0 and tier_sugerido in (_TIER_LOCAL, "local_then_remote"):
         return _TIER_LOCAL
     return _TIER_REMOTE
 

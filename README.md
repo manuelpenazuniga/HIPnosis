@@ -133,6 +133,28 @@ Every run ends with a machine-generated, human-readable certificate (excerpt bel
 
 Plus: full fix ledger (which tier fixed what, at which commit), token accounting, timing, and the `NEEDS_HUMAN` section when applicable.
 
+## 🛂 The Port Passport — provenance you can verify
+
+The certificate is human-readable. The **Port Passport** (`HIPNOSIS_ATTESTATION.jsonl`) is *machine-verifiable* — it makes "cross the border with papers" literal.
+
+Every run emits an in-toto/SLSA-inspired attestation with SHA-256 digests of the diff and certificate, the source and final commits, the build environment (GPU, ROCm, oracle mode), and the verdict:
+
+```json
+{
+  "predicate": {
+    "builder": { "id": "hipnosis://port-agent" },
+    "source":  { "commit": "3f8a1c2…" },
+    "port":    { "final_commit": "b7e9d04…" },
+    "materials": { "diff": { "alg": "sha256", "digest": "8b3f1a9…c10401" } },
+    "environment": { "gpu_arch": "gfx942", "oracle_mode": "real" },
+    "result": { "verdict": "PASS", "errors_initial": 8, "errors_final": 0 },
+    "provenance_level": "SLSA-L1 (unsigned): describes inputs, build and environment"
+  }
+}
+```
+
+The dashboard recomputes `sha256(diff)` **in your browser** and compares it to the attestation — a green **`PASSPORT VERIFIED`** badge. Flip a single byte of the port and it turns **`TAMPERED`**. No blockchain, no trust-me: the hash either matches or it doesn't. (We claim SLSA **L1** — honest provenance of inputs and build; not L2, because it isn't signed yet.)
+
 ## 🏗 Architecture
 
 ```

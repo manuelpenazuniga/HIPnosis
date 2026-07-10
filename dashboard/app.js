@@ -83,6 +83,9 @@ const state = {
   diffFetched: false,
   certFetched: false,
   certRaw: '',
+  attestation: null,
+  attestFetched: false,
+  diffText: '',
 };
 
 function getRunId() {
@@ -460,7 +463,100 @@ async function fetchDiff() {
     const resp = await fetch(`/runs/${state.runId}/diff`);
     if (resp.ok) {
       const data = await resp.json();
-      renderDiff(data.diff || '');
+      state.diffText = data.diff || '';
+      renderDiff(state.diffText);
+    }
+  } catch (e) { /* silent */ }
+}
+
+// --- Port Passport (wow #2): verificación de hashes client-side --------------
+async function sha256Hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function setPassportBadge(kind) {
+  const el = $('passport-badge');
+  const map = {
+    verified: { cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/40', label: '● PASSPORT VERIFIED' },
+    tampered: { cls: 'bg-red-500/15 text-red-400 border-red-500/40', label: '✕ TAMPERED' },
+    pending:  { cls: 'bg-gray-500/15 text-gray-400 border-gray-500/30', label: '… verifying' },
+    nodiff:   { cls: 'bg-amber-500/15 text-amber-400 border-amber-500/30', label: 'diff unavailable' },
+  };
+  const m = map[kind] || map.pending;
+  el.className = `px-3 py-1.5 rounded-lg text-xs font-bold border ${m.cls}`;
+  el.textContent = m.label;
+}
+
+async function verifyPassport(diffOverride) {
+  const att = state.attestation;
+  if (!att) return;
+  const declared = att.predicate?.materials?.diff?.digest;
+  const msg = $('passport-verify-msg');
+  if (!declared) { setPassportBadge('nodiff'); return; }
+  setPassportBadge('pending');
+  // La verificación obtiene el diff DIRECTO del endpoint (la fuente que se
+  // atesta) para no depender del orden de carga; el tamper demo pasa override.
+  let diff = diffOverride;
+  if (typeof diff !== 'string') {
+    try {
+      const resp = await fetch(`/runs/${state.runId}/diff`);
+      diff = resp.ok ? ((await resp.json()).diff || '') : state.diffText;
+    } catch (e) { diff = state.diffText; }
+    state.diffText = diff;
+  }
+  const actual = await sha256Hex(diff);
+  if (actual === declared) {
+    setPassportBadge('verified');
+    msg.textContent = 'recomputed sha256(diff) matches the attestation';
+    msg.className = 'text-xs text-emerald-500';
+  } else {
+    setPassportBadge('tampered');
+    msg.textContent = `hash mismatch — declared …${declared.slice(-12)}, got …${actual.slice(-12)}`;
+    msg.className = 'text-xs text-red-400';
+  }
+}
+
+function renderPassport() {
+  const att = state.attestation;
+  if (!att) return;
+  const p = att.predicate || {};
+  const short = (s) => (s && s.length > 20 ? s.slice(0, 10) + '…' + s.slice(-6) : (s || '—'));
+  const row = (label, value, mono = true) =>
+    `<div class="flex items-baseline gap-2 min-w-0">
+       <span class="text-[10px] uppercase tracking-wider text-gray-500 flex-shrink-0">${label}</span>
+       <span class="${mono ? 'font-mono' : ''} text-gray-300 truncate" title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</span>
+     </div>`;
+  const r = p.result || {};
+  const fields = [
+    row('Source commit', short(p.source?.commit)),
+    row('Final commit', short(p.port?.final_commit)),
+    row('Diff digest', 'sha256:' + short(p.materials?.diff?.digest)),
+    row('Cert digest', 'sha256:' + short(p.materials?.certificate?.digest)),
+    row('Builder', p.builder?.id),
+    row('GPU / mode', `${p.environment?.gpu_arch || '—'} · ${p.environment?.oracle_mode || '—'}`),
+    row('Verdict', `${r.verdict || '—'} (${r.errors_initial ?? '?'} → ${r.errors_final ?? '?'} errors)`),
+    row('Provenance', p.provenance_level || 'SLSA-L1', false),
+  ].join('');
+  $('passport-fields').innerHTML = fields;
+  $('passport-section').classList.remove('hidden');
+  revealSection('passport-section');
+  verifyPassport();
+}
+
+async function fetchAttestation() {
+  if (state.attestFetched) return;
+  state.attestFetched = true;
+  try {
+    const resp = await fetch(`/runs/${state.runId}/attestation`);
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.attestation) {
+        state.attestation = data.attestation;
+        // el diff debe estar cargado para verificar; asegurarlo
+        await fetchDiff();
+        renderPassport();
+      }
     }
   } catch (e) { /* silent */ }
 }
@@ -599,6 +695,7 @@ async function pollEvents() {
       setConn('done', 'run finished');
       fetchDiff();
       fetchCertificate();
+      fetchAttestation();
       return;
     }
   } catch (err) {
@@ -642,6 +739,7 @@ async function loadDemoData() {
     }
     fetchDiff();
     fetchCertificate();
+    fetchAttestation();
   } catch (err) {
     const msg = $('newrun-msg');
     msg.textContent = 'Could not connect to the API or load demo data.';
@@ -660,6 +758,29 @@ function initCertToggle() {
   $('cert-toggle').addEventListener('click', () => {
     state.certOpen = !state.certOpen;
     applyCertToggle();
+  });
+}
+
+function initPassport() {
+  $('passport-verify-btn').addEventListener('click', () => verifyPassport());
+  $('passport-tamper-btn').addEventListener('click', () => {
+    // Demo de manipulación: verificar contra un diff con un byte cambiado.
+    // NO altera state.diffText — es una prueba efímera de que el hash detecta
+    // la más mínima modificación. Re-verify vuelve a VERIFIED.
+    const tampered = state.diffText
+      ? state.diffText.replace(/./, c => (c === 'x' ? 'y' : 'x'))
+      : 'x';
+    verifyPassport(tampered);
+  });
+  $('passport-download-btn').addEventListener('click', () => {
+    if (!state.attestation) return;
+    const blob = new Blob([JSON.stringify(state.attestation) + '\n'], { type: 'application/jsonl' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HIPNOSIS_ATTESTATION-${state.runId}.jsonl`;
+    a.click();
+    URL.revokeObjectURL(url);
   });
 }
 
@@ -773,6 +894,7 @@ async function init() {
   initCertToggle();
   initDownload();
   initNewRun();
+  initPassport();
   $('run-select').addEventListener('change', (e) => {
     if (e.target.value && e.target.value !== state.runId) {
       window.location.search = `?run=${encodeURIComponent(e.target.value)}`;

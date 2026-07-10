@@ -704,7 +704,8 @@ def test_ship_module_l4_purity_imports() -> None:
 
     allowed_core = {
         "core.schemas", "core.gitrepo", "core.config", "core.trace",
-        "core.report", "core",  # `from core import ...`
+        "core.report", "core.attestation",  # L3: digests del Port Passport
+        "core",  # `from core import ...`
     }
     # Nombres legítimos que ``core.report`` y compañía exportan.
     allowed_core_names = {
@@ -719,6 +720,8 @@ def test_ship_module_l4_purity_imports() -> None:
         "TraceWriter",
         # de core.schemas (no los usamos en runtime, pero permitidos)
         "VerifyResult", "Run", "ScanResult",
+        # de core.attestation (Port Passport, L3)
+        "build_attestation", "workspace_diff", "write_attestation",
     }
     forbidden_roots = {"core.state", "core.api", "core.oracle", "core.llm", "app"}
     stdlib_roots = {

@@ -249,6 +249,10 @@ def _cfg(**overrides: Any) -> Config:
         ("llm", 0, "remote", "remote"),
         ("llm", 1, "local", "remote"),
         ("llm", 2, "local", "remote"),
+        # P1 (audit codex): local_then_remote prueba local en el 1er intento,
+        # remoto en los siguientes (antes saltaba directo a remoto).
+        ("llm", 0, "local_then_remote", "local"),
+        ("llm", 1, "local_then_remote", "remote"),
     ],
 )
 def test_decide_tier_table(strategy, attempts, tier_sugerido, expected):

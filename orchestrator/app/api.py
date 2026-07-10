@@ -232,6 +232,34 @@ def get_run_certificate(run_id: str, request: Request) -> dict:
     return {"markdown": demo.read_text() if demo.exists() else ""}
 
 
+@router.get("/runs/{run_id}/attestation")
+def get_run_attestation(run_id: str, request: Request) -> dict:
+    """El Port Passport (atestación JSONL). Workspace vivo o demo bundleado.
+
+    Formato: {"attestation": <objeto>}. El dashboard recomputa el digest del
+    diff en el browser y lo compara con ``materials.diff.digest`` (VERIFIED /
+    TAMPERED). Devuelve {} si aún no existe.
+    """
+    import json
+    import os
+
+    att = os.path.join(_repo_dir_for_run(run_id), "HIPNOSIS_ATTESTATION.jsonl")
+    text = ""
+    if os.path.isfile(att):
+        with open(att, encoding="utf-8") as f:
+            text = f.read().strip()
+    else:
+        demo = _fixtures_dir() / "demo-attestation.jsonl"
+        if demo.exists():
+            text = demo.read_text().strip()
+    if not text:
+        return {"attestation": None}
+    try:
+        return {"attestation": json.loads(text.splitlines()[0])}
+    except (ValueError, IndexError):
+        return {"attestation": None}
+
+
 @router.get("/healthz")
 def healthz(request: Request) -> dict:
     """Liveness probe. ``mode`` es el oracle_mode efectivo (real|mock|replay):
