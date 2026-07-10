@@ -53,9 +53,15 @@ services:
   # vLLM con Gemma 3 27B IT — imagen OFICIAL, no se compila nada (F-01).
   vllm:
     profiles: ["gpu"]
-    image: rocm/vllm:latest
-    environment:
-      HF_TOKEN: ${HF_TOKEN:-}                          # Gemma es gated (F-01c)
+    # Pineada a la familia gfx94X (MI300X = gfx942); `latest` hacía la demo
+    # irreproducible (audit codex P0.11). Override para M0: VLLM_IMAGE_TAG en el shell.
+    image: rocm/vllm:${VLLM_IMAGE_TAG:-rocm7.13.0_gfx94X-dcgpu_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1}
+    env_file:
+      # HF_TOKEN llega por el MISMO orchestrator/.env que documenta el README/M0.
+      # OJO: no volver a declarar HF_TOKEN bajo `environment:` — environment tiene
+      # precedencia sobre env_file y una interpolación vacía ${HF_TOKEN:-} lo pisaría.
+      - path: orchestrator/.env
+        required: false
     command: >
       --model google/gemma-3-27b-it
       --max-model-len 32768

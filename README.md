@@ -14,9 +14,9 @@
 
 [Quickstart](#-quickstart-no-gpu-required) · [How it works](#-how-it-works) · [Why it's different](#-why-hipnosis-wins-where-others-stop) · [The wave64 story](#-the-bug-nobody-else-catches) · [Architecture](#-architecture)
 
-<img src="assets/dashboard.png" alt="HIPnosis dashboard — a real CUDA repo ported to ROCm live: 8 build errors drained to 0, 100% resolved locally, 2 wave64 correctness bugs caught" width="100%">
+<img src="assets/dashboard.png" alt="HIPnosis dashboard — the full pipeline replayed live: 8 build errors drained to 0, 100% resolved locally, 2 wave64 correctness bugs caught" width="100%">
 
-*A real port, live: 8 compiler errors drained to 0, 100% fixed locally at $0 API cost, and 2 silent correctness bugs caught that a textual translation would have shipped.*
+*The full pipeline, live (synthetic demo replay): 8 compiler errors drained to 0, 100% fixed locally, and 2 silent correctness bugs flagged that a textual translation would have shipped. Real-silicon MI300X artifacts land with our M0 run — see roadmap.*
 
 </div>
 
@@ -34,7 +34,7 @@ There are **billions of dollars of CUDA code** locked to one vendor's hardware. 
 
 ## 🚀 Quickstart (no GPU required)
 
-The full experience — a real recorded port of a Smith-Waterman CUDA kernel, replayed live — runs on any laptop:
+The full experience — a Smith-Waterman CUDA port replayed live through the entire pipeline (synthetic demo fixtures; the recorded MI300X trace replaces them after our first silicon run) — runs on any laptop:
 
 ```bash
 git clone https://github.com/manuelpenazuniga/HIPnosis.git
@@ -48,11 +48,13 @@ Have an AMD GPU? Run the real thing:
 ```bash
 cp orchestrator/.env.example orchestrator/.env   # add your HF_TOKEN (Gemma is gated)
 docker compose --profile gpu up -d --build
-# paste any CUDA repo URL into the dashboard, or:
+# paste one of the curated demo CUDA repos into the dashboard, or:
 curl -X POST http://localhost:8080/runs \
   -H 'Content-Type: application/json' \
-  -d '{"repo_url": "https://github.com/your-org/your-cuda-kernel"}'
+  -d '{"repo_url": "https://github.com/zjin-lcf/HeCBench"}'
 ```
+
+> **Note on scope:** runs are currently limited to curated demo repositories — executing an arbitrary repo's Makefile safely requires sandboxing that is on the roadmap, not faked.
 
 ## ⚙️ How it works
 
@@ -118,11 +120,11 @@ HIPnosis routes intelligence in three tiers, cheapest first:
 | **Local** | Gemma 3 27B on the same MI300X (vLLM, ROCm-native) | $0 API |
 | **Remote** | Frontier LLM (Fireworks) — hard cases only, forced after stagnation | cents |
 
-In the demo port: **100% resolved locally, $0.00 cloud spend.** The GPU that verifies your port is the GPU that thinks about your port.
+In the synthetic demo scenario: **100% resolved locally, $0.00 cloud spend.** The GPU that verifies your port is the GPU that thinks about your port. (Measured token accounting from real-silicon runs ships with M0 — we only publish numbers the pipeline actually computed.)
 
 ## 📊 What you get: the Port Certificate
 
-Every run ends with a machine-generated, human-readable certificate:
+Every run ends with a machine-generated, human-readable certificate (excerpt below from the synthetic demo scenario):
 
 > **HIPnosis — Port Certificate**
 > **Repo:** `github.com/zjin-lcf/HeCBench (src/bsw-cuda)` · **Difficulty:** medium · **Build:** make
@@ -153,10 +155,10 @@ Plus: full fix ledger (which tier fixed what, at which commit), token accounting
 
 ## 🗺 Status & roadmap
 
-- ✅ Full pipeline end-to-end (scan → port → loop → verify → certificate), 3 demo repos green
+- ✅ Full pipeline end-to-end (scan → port → loop → verify → certificate) — 3 fixture scenarios green in mock mode
 - ✅ Wave64 static analyzer validated against real kernels (zero false positives)
 - ✅ Live dashboard with honest observability (mode badges, connection state, failure causes)
-- 🔜 Real-silicon M0 run on MI300X (AMD Developer Cloud)
+- 🔜 Real-silicon M0 run on MI300X (AMD Developer Cloud) — replaces the synthetic replay with a recorded trace
 - 🔜 Performance benchmarking (`rocprof`) in the certificate: "compiles" ≠ "performs"
 - 🔭 Multi-repo fleets, CMake support, CI integration ("port regression bot")
 

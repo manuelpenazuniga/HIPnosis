@@ -79,6 +79,7 @@ const state = {
   demoMode: false,
   apiAlive: false,
   retryDelay: 1000,
+  mode: '',
   diffFetched: false,
   certFetched: false,
   certRaw: '',
@@ -490,6 +491,7 @@ function processEvent(ev) {
     case 'run_meta':
       state.runMeta = ev;
       renderScanStrip();
+      renderModeBadge();   // la procedencia (recorded vs synthetic) vive en el trace
       break;
     case 'scan':
       state.scan = ev;
@@ -705,14 +707,20 @@ function initDownload() {
 }
 
 function renderModeBadge(mode) {
+  if (mode) state.mode = mode;
   const el = $('mode-badge');
+  // Procedencia honesta (audit codex P0.2): "recorded run" SOLO si el trace
+  // mismo declara oracle_mode=real en run_meta. Un fixture sintético jamás
+  // debe presentarse como corrida grabada.
+  const recorded = state.runMeta && state.runMeta.oracle_mode === 'real';
   const map = {
-    replay: { cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', label: 'REPLAY · recorded run' },
+    replay: { cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+              label: recorded ? 'REPLAY · recorded run' : 'REPLAY · synthetic demo' },
     real:   { cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', label: 'LIVE · MI300X' },
     mock:   { cls: 'bg-gray-500/10 text-gray-400 border-gray-500/20', label: 'MOCK' },
     demo:   { cls: 'bg-amber-500/10 text-amber-400 border-amber-500/20', label: 'DEMO · offline fixtures' },
   };
-  const m = map[mode];
+  const m = map[state.mode];
   if (!m) { el.classList.add('hidden'); return; }
   el.className = `px-2 py-0.5 rounded-md text-[10px] font-bold border ${m.cls}`;
   el.textContent = m.label;

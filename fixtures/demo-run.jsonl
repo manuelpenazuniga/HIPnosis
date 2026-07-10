@@ -1,5 +1,5 @@
 {"ts":"2026-07-08T14:00:00.000000+00:00","run":"run_bsw01a2","ev":"phase","phase":"QUEUED"}
-{"ts":"2026-07-08T14:00:00.400000+00:00","run":"run_bsw01a2","ev":"run_meta","repo_url":"https://github.com/zjin-lcf/HeCBench (src/bsw-cuda)","oracle_mode":"real","gpu_arch":"gfx942"}
+{"ts":"2026-07-08T14:00:00.400000+00:00","run":"run_bsw01a2","ev":"run_meta","repo_url":"https://github.com/zjin-lcf/HeCBench (src/bsw-cuda)","oracle_mode":"mock","gpu_arch":"gfx942"}
 {"ts":"2026-07-08T14:00:01.000000+00:00","run":"run_bsw01a2","ev":"phase","phase":"CLONING"}
 {"ts":"2026-07-08T14:00:03.200000+00:00","run":"run_bsw01a2","ev":"clone","files":9,"branch":"hipnosis/rocm-port"}
 {"ts":"2026-07-08T14:00:03.500000+00:00","run":"run_bsw01a2","ev":"phase","phase":"SCANNING"}

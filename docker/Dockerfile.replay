@@ -6,6 +6,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# git: GitPython (importado vía core.state → core.gitrepo al arrancar la app)
+# necesita el BINARIO git aunque el modo replay nunca clone nada — sin él,
+# `import app.main` muere con "Bad git executable" (audit codex P0.1).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 # Dependencias de RUNTIME del orquestador en modo replay (sin herramientas de build).
 RUN pip install --no-cache-dir \
     "fastapi>=0.110" \
