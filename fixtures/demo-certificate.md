@@ -1,7 +1,7 @@
 # HIPnosis — Port Certificate
 
 > **Repo:** `github.com/zjin-lcf/HeCBench (src/bsw-cuda)`
-> **Run:** ``  ·  **Generated:** 
+> **Run:** `run_bsw01a2`  ·  **Generated:** `2026-07-08`
 > **Difficulty:** `medium`  ·  **Build system:** `make`
 
 ---
