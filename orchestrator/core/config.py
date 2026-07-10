@@ -28,6 +28,12 @@ class Config:
     # Precio del tier remoto (USD por millón de tokens) para el costo del
     # reporte/dashboard. F-17: el número se calcula acá, nunca en el frontend.
     remote_price_per_mtok: float = 3.0
+    # Allowlist de repos que el endpoint público acepta (audit codex P0.12).
+    # Vacía = sin restricción (dev). En el deploy público se setea a los repos
+    # demo curados: en modo real, POST /runs ejecuta el Makefile + binario del
+    # repo dentro del contenedor con los tokens montados — un repo hostil los
+    # exfiltraría. Substring match sobre repo_url.
+    repo_allowlist: tuple[str, ...] = ()
 
 
 def _getenv_str(name: str, default: str) -> str:
@@ -71,6 +77,9 @@ def get_config() -> Config:
         price_h100_hr=_getenv_float("PRICE_H100_HR", 0.0),
         price_mi300x_hr=_getenv_float("PRICE_MI300X_HR", 0.0),
         remote_price_per_mtok=_getenv_float("REMOTE_PRICE_PER_MTOK", 3.0),
+        repo_allowlist=tuple(
+            s.strip() for s in _getenv_str("REPO_ALLOWLIST", "").split(",") if s.strip()
+        ),
     )
 
 

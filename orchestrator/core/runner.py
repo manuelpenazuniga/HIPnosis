@@ -208,6 +208,16 @@ def execute_run(run_id: str, store: SqliteRunStore, config: Config) -> Run:
     os.makedirs(os.path.dirname(trace_path_for_run(run_id)), exist_ok=True)
     trace = TraceWriter(trace_path_for_run(run_id), run_id)
 
+    # run_meta: procedencia del run (oracle_mode + gpu_arch). El dashboard lo
+    # usa para el badge 'recorded run' (real) vs 'synthetic demo' (mock), y
+    # record_fixture.sh para verificar que un trace grabado sea REAL (P0.2).
+    trace.emit(
+        "run_meta",
+        repo_url=run.repo_url,
+        oracle_mode=config.oracle_mode,
+        gpu_arch=config.gpu_arch,
+    )
+
     # Workspace: real clona; mock stage hermético.
     if config.oracle_mode == "real":
         os.makedirs(os.path.dirname(repo_dir), exist_ok=True)

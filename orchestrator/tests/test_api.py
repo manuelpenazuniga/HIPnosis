@@ -55,6 +55,27 @@ def test_post_runs_rejects_empty_repo_url(client: TestClient) -> None:
     assert resp.status_code == 422
 
 
+def test_post_runs_allowlist_rejects_unlisted_repo() -> None:
+    """P0.12: con una allowlist no vacía, un repo fuera de ella da 403 y NO se crea."""
+    from dataclasses import replace
+    app = create_app()
+    app.state.config = replace(app.state.config, repo_allowlist=("github.com/me/bsw-cuda",))
+    c = TestClient(app)
+
+    bad = c.post("/runs", json={"repo_url": "https://github.com/evil/malware"})
+    assert bad.status_code == 403
+    assert c.get("/runs").json() == [], "un repo rechazado no debe crear run"
+
+    ok = c.post("/runs", json={"repo_url": "https://github.com/me/bsw-cuda"})
+    assert ok.status_code == 200
+
+
+def test_post_runs_empty_allowlist_allows_any_repo(client: TestClient) -> None:
+    """Allowlist vacía (default dev/mock) = sin restricción."""
+    resp = client.post("/runs", json={"repo_url": "https://github.com/anyone/anything"})
+    assert resp.status_code == 200
+
+
 def test_get_run_returns_created_run(client: TestClient) -> None:
     created = client.post("/runs", json={"repo_url": "https://x/y"}).json()
     run_id = created["id"]

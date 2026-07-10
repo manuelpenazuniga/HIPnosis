@@ -85,11 +85,26 @@ def create_run(body: CreateRunBody, request: Request) -> Run:
     aparte, para que POST devuelva de inmediato y el dashboard vea la corrida en vivo
     por polling. Si ``app.state.autorun`` es False (tests) solo se encola.
     """
+    app = request.app
+    config = getattr(app.state, "config", None)
+
+    # P0.12: en el deploy público (real), POST /runs ejecuta el Makefile + el
+    # binario del repo con los tokens montados en el contenedor. Una allowlist
+    # no vacía restringe a los repos demo curados; un repo fuera de ella se
+    # rechaza ANTES de crear el run. Vacía = sin restricción (dev/mock).
+    allowlist = getattr(config, "repo_allowlist", ()) if config is not None else ()
+    if allowlist and not any(entry in body.repo_url for entry in allowlist):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "repo_url not in the curated allowlist. This deployment only "
+                "ports vetted demo repositories."
+            ),
+        )
+
     store = _get_store(request)
     run = store.create(body.repo_url)
 
-    app = request.app
-    config = getattr(app.state, "config", None)
     autorun = getattr(app.state, "autorun", False)
     db_path = getattr(app.state, "db_path", None)
     # replay no ejecuta pipeline (AD-4); tampoco sin autorun/db_path.

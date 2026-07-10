@@ -29,6 +29,9 @@ services:
       LOCAL_LLM_BASE_URL: http://vllm:8000/v1
       LOCAL_LLM_MODEL: google/gemma-3-27b-it
       GPU_ARCH: gfx942
+      # P0.12: el endpoint público solo portea los repos demo curados (ejecuta
+      # su Makefile+binario con los tokens montados). Override con REPO_ALLOWLIST.
+      REPO_ALLOWLIST: ${REPO_ALLOWLIST:-bsw-cuda,softmax-cuda,scan-cuda}
     env_file:
       # secretos (FIREWORKS_API_KEY, HF_TOKEN, GITHUB_TOKEN); NO versionado.
       # required: false → no rompe si aún no se creó el .env (se crea en M0 en el droplet).

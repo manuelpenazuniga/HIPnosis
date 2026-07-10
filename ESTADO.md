@@ -122,3 +122,12 @@ Tramo 2 (P0.3/4/5/7/8/9): green exige returncode==0 (grupo sintético E13 si exi
   E05 de bsw vía demo-patch enlatado (SOLO la propuesta es fixture; patcher/commit/build/delta reales).
   378 tests (8 gates nuevos en test_oracle_gates.py). Verificado en vivo: 3 repos demo DONE con
   todos los fixes applied=true y deltas reales.
+Tramo 3 (M0 llave-en-mano, sin GPU): 3 repos demo STANDALONE armados (bsw/softmax/scan-cuda desde
+  HeCBench BSD-3, solo variante -cuda INV-11, sin CMake; test-data real de bsw traído del DVC remote
+  S3 anónimo, md5 verificado 7824d06...; hipnosis.yaml + LICENSE + README de procedencia c/u) — listos
+  para push a github.com/manuelpenazuniga (el push lo dispara el humano). record_fixture.sh: graba
+  trace+cert+diff de un run real a fixtures en un comando (verifica oracle_mode=real; smoke-test OK).
+  Allowlist P0.12: REPO_ALLOWLIST en config+api (403 si repo fuera de lista) + compose gpu la setea a
+  los 3 demos. runner ahora emite run_meta(oracle_mode,gpu_arch) — sin esto el badge 'recorded run'
+  jamás se activaría en M0. Runbook M0 apunta a los repos standalone + record_fixture.sh. 380 tests.
+====================================================================
