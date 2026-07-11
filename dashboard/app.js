@@ -456,17 +456,30 @@ function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// Deploy estático (Vercel/Pages, sin backend): cuando los endpoints /runs/*
+// no existen, caemos a los fixtures bundleados. Es EL MISMO artefacto que el
+// backend real serviría en modo replay — el badge sigue diciendo "synthetic
+// demo" y el passport igual verifica (hash del demo-diff commiteado).
+async function fetchStaticFallback(file) {
+  try {
+    const resp = await fetch(`../fixtures/${file}`);
+    return resp.ok ? resp : null;
+  } catch (e) { return null; }
+}
+
 async function fetchDiff() {
   if (state.diffFetched) return;
   state.diffFetched = true;
   try {
-    const resp = await fetch(`/runs/${state.runId}/diff`);
+    let resp = await fetch(`/runs/${state.runId}/diff`);
     if (resp.ok) {
-      const data = await resp.json();
-      state.diffText = data.diff || '';
+      state.diffText = (await resp.json()).diff || '';
       renderDiff(state.diffText);
+      return;
     }
-  } catch (e) { /* silent */ }
+  } catch (e) { /* cae al fixture */ }
+  const fb = await fetchStaticFallback('demo-diff.txt');
+  if (fb) { state.diffText = await fb.text(); renderDiff(state.diffText); }
 }
 
 // --- Port Passport (wow #2): verificación de hashes client-side --------------
@@ -499,10 +512,15 @@ async function verifyPassport(diffOverride) {
   // atesta) para no depender del orden de carga; el tamper demo pasa override.
   let diff = diffOverride;
   if (typeof diff !== 'string') {
+    diff = null;
     try {
       const resp = await fetch(`/runs/${state.runId}/diff`);
-      diff = resp.ok ? ((await resp.json()).diff || '') : state.diffText;
-    } catch (e) { diff = state.diffText; }
+      if (resp.ok) diff = (await resp.json()).diff || '';
+    } catch (e) { /* cae al fixture */ }
+    if (diff === null) {
+      const fb = await fetchStaticFallback('demo-diff.txt');
+      diff = fb ? await fb.text() : state.diffText;
+    }
     state.diffText = diff;
   }
   const actual = await sha256Hex(diff);
@@ -547,18 +565,20 @@ function renderPassport() {
 async function fetchAttestation() {
   if (state.attestFetched) return;
   state.attestFetched = true;
+  let att = null;
   try {
     const resp = await fetch(`/runs/${state.runId}/attestation`);
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.attestation) {
-        state.attestation = data.attestation;
-        // el diff debe estar cargado para verificar; asegurarlo
-        await fetchDiff();
-        renderPassport();
-      }
-    }
-  } catch (e) { /* silent */ }
+    if (resp.ok) att = (await resp.json()).attestation;
+  } catch (e) { /* cae al fixture */ }
+  if (!att) {
+    const fb = await fetchStaticFallback('demo-attestation.jsonl');
+    if (fb) { try { att = JSON.parse((await fb.text()).trim().split('\n')[0]); } catch (e) { /* */ } }
+  }
+  if (att) {
+    state.attestation = att;
+    await fetchDiff();   // el diff debe estar cargado para verificar
+    renderPassport();
+  }
 }
 
 async function fetchCertificate() {
@@ -566,11 +586,10 @@ async function fetchCertificate() {
   state.certFetched = true;
   try {
     const resp = await fetch(`/runs/${state.runId}/certificate`);
-    if (resp.ok) {
-      const data = await resp.json();
-      renderCertificate(data.markdown || '');
-    }
-  } catch (e) { /* silent */ }
+    if (resp.ok) { renderCertificate((await resp.json()).markdown || ''); return; }
+  } catch (e) { /* cae al fixture */ }
+  const fb = await fetchStaticFallback('demo-certificate.md');
+  if (fb) renderCertificate(await fb.text());
 }
 
 function processEvent(ev) {
@@ -715,10 +734,17 @@ async function pollEvents() {
 async function loadDemoData() {
   state.demoMode = true;
   state.polling = false;
-  // Honestidad (audit H1): si mostramos fixtures, decirlo — nunca hacerlos
-  // pasar por un run vivo.
-  renderModeBadge('demo');
-  setConn('done', 'demo playback — orchestrator unreachable');
+  // Dos casos honestos (audit H1):
+  //  - apiAlive: había un backend vivo y se cayó → "offline fixtures" (degradado).
+  //  - sin backend (deploy estático Vercel/Pages, por diseño) → replay
+  //    intencional del run grabado; el badge lo deriva del trace (synthetic).
+  if (state.apiAlive) {
+    renderModeBadge('demo');
+    setConn('done', 'demo playback — orchestrator unreachable');
+  } else {
+    state.mode = 'replay';   // el trace (oracle_mode=mock) → "REPLAY · synthetic demo"
+    setConn('done', 'replay — recorded run');
+  }
   try {
     const resp = await fetch('../fixtures/demo-run.jsonl');
     if (!resp.ok) throw new Error('demo not found');

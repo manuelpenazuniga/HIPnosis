@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HIPnosis — the CUDA→ROCm port that comes with receipts</title>
+  <meta name="description" content="Autonomous CUDA→ROCm porting agent. Compiles on a real MI300X, catches the wavefront bugs a textual port ships silently, and hands you a verifiable proof.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ED1C24'/%3E%3Ctext x='32' y='45' font-size='38' font-weight='800' font-family='Arial,sans-serif' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="dashboard/vendor/fonts.css">
+  <link rel="stylesheet" href="dashboard/vendor/tailwind.css">
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+    /* Textura de fondo: rejilla técnica tenue, coherente con el instrumento. */
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 44px 44px;
+    }
+    .amd-glow { box-shadow: 0 0 80px -20px rgba(237,28,36,0.35); }
+
+    @keyframes pulse-dot { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:.45; transform:scale(.8);} }
+    .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+    /* Firma: barrido de sello sobre el passport (el "estampado"). */
+    @keyframes stamp-scan { 0% { transform: translateY(-100%);} 100% { transform: translateY(400%);} }
+    .stamp-scan { animation: stamp-scan 3.2s ease-in-out infinite; }
+
+    @keyframes rise { from { opacity:0; transform: translateY(14px);} to { opacity:1; transform:none;} }
+    .rise { opacity:0; animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+
+    .link-underline { background-image: linear-gradient(#ED1C24,#ED1C24); background-size: 0% 1.5px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size .3s ease; }
+    .link-underline:hover { background-size: 100% 1.5px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+      .rise { opacity:1 !important; }
+    }
+  </style>
+</head>
+<body class="bg-surface-900 text-gray-100 min-h-screen grid-bg antialiased">
+  <div class="max-w-[1240px] mx-auto px-5 sm:px-8">
+
+    <!-- Nav -->
+    <nav class="flex items-center justify-between py-6">
+      <div class="flex items-center gap-2.5">
+        <span class="inline-block w-6 h-1.5 bg-amd rounded-full"></span>
+        <span class="font-black tracking-tight text-lg"><span class="text-white">HIP</span><span class="text-amd">nosis</span></span>
+      </div>
+      <div class="flex items-center gap-6 text-sm text-gray-400">
+        <a href="https://github.com/manuelpenazuniga/HIPnosis" class="link-underline hidden sm:inline hover:text-white transition-colors">Source</a>
+        <a href="dashboard/?run=run_bsw01a2" class="px-4 py-2 rounded-lg bg-amd text-white font-semibold hover:bg-red-600 transition-colors">Live demo →</a>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <header class="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-8 items-center pt-10 sm:pt-16 pb-20">
+      <div>
+        <div class="rise text-[11px] font-mono uppercase text-amd mb-6" style="animation-delay:.05s;letter-spacing:0.25em">
+          AMD Developer Hackathon · ACT II — Track 3
+        </div>
+        <h1 class="rise text-[2.7rem] sm:text-6xl font-black tracking-tight leading-[1.02]" style="animation-delay:.12s">
+          A CUDA port that<br>compiles can still be<br><span class="text-amd">silently wrong.</span>
+        </h1>
+        <p class="rise text-lg text-gray-400 mt-6 max-w-xl leading-relaxed" style="animation-delay:.2s">
+          <span class="font-mono text-gray-300">hipify</span> translates the syntax and stops. HIPnosis compiles on a
+          real MI300X, drains every build error, catches the wavefront-64 bugs a textual
+          port ships in silence, and hands you a <span class="text-white font-semibold">proof you can verify yourself</span>.
+        </p>
+        <div class="rise flex flex-wrap items-center gap-3 mt-8" style="animation-delay:.28s">
+          <a href="dashboard/?run=run_bsw01a2" class="px-6 py-3 rounded-xl bg-amd text-white font-bold hover:bg-red-600 transition-colors amd-glow">
+            Launch live demo →
+          </a>
+          <a href="https://github.com/manuelpenazuniga/HIPnosis" class="px-6 py-3 rounded-xl bg-white/5 text-gray-300 font-semibold border border-white/10 hover:bg-white/10 transition-colors">
+            Read the source
+          </a>
+        </div>
+        <p class="rise text-xs text-gray-500 mt-5 font-mono" style="animation-delay:.34s">
+          387 tests · Gemma 3 27B local · ROCm · $0 API on the demo port
+        </p>
+      </div>
+
+      <!-- Firma: el Port Passport estampado -->
+      <div class="rise" style="animation-delay:.24s">
+        <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-surface-800/80 backdrop-blur amd-glow">
+          <div class="stamp-scan absolute inset-x-0 h-24 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent pointer-events-none"></div>
+          <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+            <span class="text-[11px] font-mono uppercase tracking-widest text-gray-500">Port Passport</span>
+            <span class="px-2.5 py-1 rounded-md text-[11px] font-bold border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
+              <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot mr-1 align-middle"></span>VERIFIED
+            </span>
+          </div>
+          <div class="p-6 font-mono text-[13px] space-y-2.5">
+            <div class="flex justify-between gap-4"><span class="text-gray-500">repo</span><span class="text-gray-300 truncate">bsw-cuda · Smith-Waterman</span></div>
+            <div class="flex justify-between gap-4"><span class="text-gray-500">diff</span><span class="text-emerald-400">sha256:8b3f1a9…c10401</span></div>
+            <div class="flex justify-between gap-4"><span class="text-gray-500">verdict</span><span class="text-white">PASS · 8 → 0 errors</span></div>
+            <div class="flex justify-between gap-4"><span class="text-gray-500">wave64</span><span class="text-amber-400">2 correctness bugs caught</span></div>
+            <div class="flex justify-between gap-4"><span class="text-gray-500">target</span><span class="text-amd">gfx942 · MI300X</span></div>
+          </div>
+          <div class="px-6 pb-5 pt-1 text-[11px] text-gray-500 leading-relaxed border-t border-white/5">
+            The demo recomputes <span class="text-gray-400 font-mono">sha256(diff)</span> in your browser.
+            Change one byte of the port and this seal reads <span class="text-red-400 font-semibold">TAMPERED</span>.
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Differentiators -->
+    <section class="grid sm:grid-cols-3 gap-4 pb-16">
+      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
+        <div class="text-amd font-mono text-xs mb-3">01 · ORACLE, NOT OPINION</div>
+        <h3 class="font-bold text-white mb-2">A real build loop</h3>
+        <p class="text-sm text-gray-400 leading-relaxed">Compiles on AMD silicon, measures every fix by the compiler, and reverts what doesn't help. Success is declared by the build and the numbers — never by asking an LLM.</p>
+      </div>
+      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
+        <div class="text-amber-400 font-mono text-xs mb-3">02 · THE SILENT BUG</div>
+        <h3 class="font-bold text-white mb-2">Wave64 divergence</h3>
+        <p class="text-sm text-gray-400 leading-relaxed">AMD wavefronts are 64 lanes, not 32. A <span class="font-mono text-gray-300">__ballot_sync(0xffffffff)</span> compiles clean and computes wrong. HIPnosis flags it statically — zero false positives on real kernels.</p>
+      </div>
+      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
+        <div class="text-emerald-400 font-mono text-xs mb-3">03 · PAPERS AT THE BORDER</div>
+        <h3 class="font-bold text-white mb-2">The Port Passport</h3>
+        <p class="text-sm text-gray-400 leading-relaxed">Every run emits a hash-signed attestation of the diff, the verdict and the environment. Verifiable by anyone with <span class="font-mono text-gray-300">sha256sum</span> — no trust required.</p>
+      </div>
+    </section>
+
+    <!-- Honesty line -->
+    <section class="pb-20">
+      <div class="rounded-2xl border border-white/8 bg-gradient-to-r from-surface-800/60 to-transparent p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+        <p class="text-gray-300 leading-relaxed max-w-3xl">
+          <span class="text-white font-semibold">Radical honesty is the point.</span>
+          The demo replays a recorded run, and the badge always says so — <span class="font-mono text-amber-400">synthetic</span>,
+          <span class="font-mono text-gray-400">mock</span>, or <span class="font-mono text-emerald-400">live silicon</span>.
+          We never show a scripted terminal claiming a GPU result that didn't happen.
+        </p>
+        <a href="dashboard/?run=run_bsw01a2" class="whitespace-nowrap px-5 py-2.5 rounded-xl bg-amd text-white font-bold hover:bg-red-600 transition-colors self-start sm:self-auto">See it run →</a>
+      </div>
+    </section>
+
+    <footer class="border-t border-white/5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+      <span>HIPnosis · Autonomous CUDA → ROCm porting · MIT</span>
+      <span class="font-mono">Built with Gemma on ROCm · AMD Developer Hackathon ACT II</span>
+    </footer>
+  </div>
+</body>
+</html>

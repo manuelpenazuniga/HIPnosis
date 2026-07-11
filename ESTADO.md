@@ -131,3 +131,31 @@ Tramo 3 (M0 llave-en-mano, sin GPU): 3 repos demo STANDALONE armados (bsw/softma
   los 3 demos. runner ahora emite run_meta(oracle_mode,gpu_arch) — sin esto el badge 'recorded run'
   jamás se activaría en M0. Runbook M0 apunta a los repos standalone + record_fixture.sh. 380 tests.
 ====================================================================
+====================================================================
+🛂 WOW #2 PORT PASSPORT (GPU-independiente, ships hoy): atestación de procedencia verificable.
+core/attestation.py (L3): build_attestation computa digests SHA-256 del diff y del certificado
+  por CÓDIGO (F-17), + source/final commit, environment (gpu_arch/oracle_mode), veredicto.
+  Procedencia HONESTA = SLSA-L1 unsigned (no reclama firma que no tiene, audit codex).
+ship_handler escribe HIPNOSIS_ATTESTATION.jsonl junto al certificado (azúcar, INV-5 no tumba run).
+Endpoint GET /runs/{id}/attestation (workspace vivo o demo bundleado). Fixture demo-attestation.jsonl
+  con digest REAL de demo-diff.txt (verificado match). Dashboard: panel Port Passport que recomputa
+  sha256(diff) en el browser (SubtleCrypto, CSP-safe) y compara → badge VERIFIED/TAMPERED; botón
+  tamper (flip 1 byte → TAMPERED) + re-verify (→ VERIFIED) + download .jsonl. VERIFICADO e2e en Chrome:
+  ciclo VERIFIED→TAMPERED→VERIFIED funciona; fix de race (verify obtiene el diff directo del endpoint).
+Ademas P1 routing (audit): local_then_remote prueba LOCAL en 1er intento (antes saltaba a remoto).
+387 tests (7 nuevos: 5 attestation + 2 router). README con seccion Port Passport.
+====================================================================
+====================================================================
+🌐 DEMO PÚBLICO (vs PortForge): landing AMD + dashboard replay 100% estático, deployable a Vercel.
+Estudiado PortForge (repo+submission+demo en vivo): es traductor LLM + terminal SCRIPTEADO (timestamps
+  idénticos c/corrida; sus propias tarjetas dicen COMPILE 'Awaiting AMD GPU' y BENCHMARK 'Not run yet',
+  pero el terminal canta 'Compiled on MI300X'; "Benchmark result: Compiled successfully" = no hay benchmark;
+  100%/99%/98% sin evidencia, 0 tests, 0 oráculo, 0 wave64). ES el strawman de HIPnosis: el port que
+  compila y sigue mal. Ventajas de superficie de ellos: demo público clickeable + se siente producto.
+Respuesta: index.html landing AMD (tesis 'a port that compiles can still be silently wrong' + firma =
+  sello Port Passport VERIFIED con hash real); app.js con fetchStaticFallback (diff/cert/attestation →
+  fixtures) para correr SIN backend; loadDemoData distingue apiAlive (offline degradado) vs estático
+  (REPLAY synthetic intencional). vercel.json + .vercelignore (deploya solo landing+dashboard+fixtures;
+  backend real queda en MI300X, honesto). docs/DEPLOY.md. Verificado e2e local sin backend: landing OK,
+  demo completa (loop→wave64→diff→PASS→cert→passport) + ciclo TAMPERED↔VERIFIED. Deploy lo dispara el humano.
+====================================================================

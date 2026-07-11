@@ -1,0 +1,16 @@
+# El deploy de Vercel es SOLO el demo estático (landing + dashboard replay +
+# fixtures). El backend real (orquestador Python, GPU) vive en la MI300X, no en
+# serverless. Excluimos todo lo que no es el sitio para que el deploy quede limpio.
+orchestrator/
+docs/
+scripts/
+.agents/
+docker/
+docker-compose.yml
+CLAUDE.md
+DEVIATIONS.md
+ESTADO.md
+hipnosis.md
+hipnosis-blueprint.md
+assets/
+.github/

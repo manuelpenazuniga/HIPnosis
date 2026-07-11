@@ -2,7 +2,7 @@
 // No hay build step en runtime (F-15): el CSS generado se commitea como asset estático.
 // Debe ser el espejo exacto del tailwind.config inline que usaba el CDN.
 module.exports = {
-  content: ['./index.html', './app.js'],
+  content: ['./index.html', './app.js', '../index.html'],
   theme: {
     extend: {
       colors: {
