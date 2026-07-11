@@ -3,146 +3,367 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HIPnosis — the CUDA→ROCm port that comes with receipts</title>
-  <meta name="description" content="Autonomous CUDA→ROCm porting agent. Compiles on a real MI300X, catches the wavefront bugs a textual port ships silently, and hands you a verifiable proof.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ED1C24'/%3E%3Ctext x='32' y='45' font-size='38' font-weight='800' font-family='Arial,sans-serif' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
+  <title>HIPnosis — verified CUDA→ROCm porting on AMD Instinct</title>
+  <meta name="description" content="An autonomous agent that ports CUDA to AMD ROCm, compiles it on a real MI300X, catches the wavefront bugs a textual port ships silently, and returns a verified port with a proof you can check yourself.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%23ED1C24'/%3E%3Ctext x='32' y='45' font-size='38' font-weight='800' font-family='Arial,sans-serif' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="dashboard/vendor/fonts.css">
-  <link rel="stylesheet" href="dashboard/vendor/tailwind.css">
   <style>
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
-    .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-
-    /* Textura de fondo: rejilla técnica tenue, coherente con el instrumento. */
-    .grid-bg {
-      background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
-      background-size: 44px 44px;
+    :root{
+      --bg:#ffffff; --soft:#f5f6f8; --panel:#0b0d12;
+      --ink:#0b0d12; --body:#474d59; --muted:#767c88; --faint:#9aa0ab;
+      --rule:#e7e9ee; --rule-strong:#d4d8df;
+      --amd:#ED1C24; --amd-ink:#c1121a;
+      --green:#12854a; --green-bg:#e8f6ee; --amber:#a5610a; --amber-bg:#fbf1e2;
+      --r:14px;
     }
-    .amd-glow { box-shadow: 0 0 80px -20px rgba(237,28,36,0.35); }
-
-    @keyframes pulse-dot { 0%,100% { opacity:1; transform:scale(1);} 50% { opacity:.45; transform:scale(.8);} }
-    .pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
-
-    /* Firma: barrido de sello sobre el passport (el "estampado"). */
-    @keyframes stamp-scan { 0% { transform: translateY(-100%);} 100% { transform: translateY(400%);} }
-    .stamp-scan { animation: stamp-scan 3.2s ease-in-out infinite; }
-
-    @keyframes rise { from { opacity:0; transform: translateY(14px);} to { opacity:1; transform:none;} }
-    .rise { opacity:0; animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
-
-    .link-underline { background-image: linear-gradient(#ED1C24,#ED1C24); background-size: 0% 1.5px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size .3s ease; }
-    .link-underline:hover { background-size: 100% 1.5px; }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
-      .rise { opacity:1 !important; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      font-family:'Inter',system-ui,-apple-system,sans-serif;
+      background:var(--bg);color:var(--ink);
+      -webkit-font-smoothing:antialiased;line-height:1.5;
+      font-feature-settings:"cv05","ss01";
     }
+    .mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+    .wrap{max-width:1160px;margin:0 auto;padding:0 28px}
+    a{color:inherit;text-decoration:none}
+    .red{color:var(--amd)}
+
+    /* ---- nav ---- */
+    header.nav{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.82);
+      backdrop-filter:blur(10px);border-bottom:1px solid var(--rule)}
+    .nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
+    .brand .tick{width:22px;height:6px;background:var(--amd);border-radius:99px}
+    .nav-links{display:flex;align-items:center;gap:28px;font-size:14px;color:var(--body)}
+    .nav-links a.plain:hover{color:var(--ink)}
+    .btn{display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:14px;
+      border-radius:10px;padding:9px 16px;transition:.16s ease;cursor:pointer;border:1px solid transparent}
+    .btn-red{background:var(--amd);color:#fff}
+    .btn-red:hover{background:var(--amd-ink)}
+    .btn-ghost{border-color:var(--rule-strong);color:var(--ink);background:#fff}
+    .btn-ghost:hover{background:var(--soft)}
+    .btn-lg{padding:13px 22px;font-size:15px;border-radius:12px}
+    @media(max-width:720px){.nav-links a.plain{display:none}}
+
+    /* ---- hero ---- */
+    .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;
+      padding:76px 0 64px}
+    .eyebrow{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.16em;
+      text-transform:uppercase;color:var(--amd);font-weight:600;margin-bottom:22px}
+    h1{font-size:clamp(2.1rem,3.6vw,3.15rem);line-height:1.06;letter-spacing:-.032em;
+      font-weight:800;color:var(--ink)}
+    h1 em{font-style:normal;color:var(--amd)}
+    .lede{font-size:18px;color:var(--body);margin-top:22px;max-width:35em;line-height:1.6}
+    .cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+    .trust{font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--faint);
+      margin-top:26px;letter-spacing:.01em}
+
+    /* product shot + floating seal */
+    .shot{position:relative}
+    .frame{border:1px solid var(--rule-strong);border-radius:16px;overflow:hidden;
+      background:var(--panel);box-shadow:0 30px 60px -30px rgba(11,13,18,.35),0 8px 24px -12px rgba(11,13,18,.2)}
+    .frame .bar{display:flex;align-items:center;gap:7px;padding:11px 14px;background:#101218;
+      border-bottom:1px solid rgba(255,255,255,.06)}
+    .frame .bar i{width:11px;height:11px;border-radius:99px;display:inline-block}
+    .frame .bar .u{margin-left:12px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#6b7280}
+    .frame img{display:block;width:100%}
+    .seal{position:absolute;right:-16px;bottom:-18px;background:var(--panel);
+      border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 14px;
+      box-shadow:0 16px 34px -14px rgba(11,13,18,.5);min-width:216px}
+    .seal .h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+    .seal .tag{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+      text-transform:uppercase;color:#7a828f}
+    .seal .v{font-size:11px;font-weight:700;color:#34d17f;border:1px solid rgba(52,209,127,.35);
+      background:rgba(52,209,127,.1);border-radius:6px;padding:2px 8px}
+    .seal .dot{width:6px;height:6px;border-radius:99px;background:#34d17f;display:inline-block;margin-right:5px;
+      animation:pulse 1.6s ease-in-out infinite}
+    .seal .row{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;
+      font-size:11.5px;color:#aeb4bf;padding:2px 0}
+    .seal .row b{color:#e9ecf1;font-weight:500}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+    /* ---- built-on strip ---- */
+    .strip{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+    .strip-in{display:flex;align-items:center;gap:34px;flex-wrap:wrap;padding:20px 0}
+    .strip .lab{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+      text-transform:uppercase;color:var(--faint)}
+    .strip .item{font-weight:700;font-size:15px;color:var(--body);letter-spacing:-.01em}
+
+    /* ---- generic section ---- */
+    section{padding:72px 0}
+    .kicker{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.14em;
+      text-transform:uppercase;color:var(--amd);font-weight:600}
+    h2{font-size:clamp(1.6rem,2.6vw,2.15rem);line-height:1.12;letter-spacing:-.025em;
+      font-weight:800;margin-top:14px}
+    .sec-lede{font-size:17px;color:var(--body);margin-top:14px;max-width:44em;line-height:1.6}
+
+    /* ---- problem band ---- */
+    .band{background:var(--soft);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+    .prob{display:grid;grid-template-columns:1.1fr 1fr;gap:44px;align-items:center}
+    .code{background:var(--panel);border-radius:12px;padding:20px 22px;
+      font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.7;color:#c9cdd6;
+      border:1px solid var(--rule-strong);overflow-x:auto}
+    .code .c{color:#6b7280}.code .k{color:#ff6b6b}.code .g{color:#34d17f}.code .w{color:#f0b03e}
+
+    /* ---- comparison ---- */
+    .cmp{border:1px solid var(--rule);border-radius:var(--r);overflow:hidden}
+    .cmp-head{display:grid;grid-template-columns:1.6fr 1fr 1fr}
+    .cmp-head>div{padding:18px 22px;font-weight:700;font-size:15px;border-bottom:1px solid var(--rule)}
+    .cmp-head .t{color:var(--muted);font-weight:600}
+    .cmp-head .them{color:var(--body);background:var(--soft)}
+    .cmp-head .us{color:var(--amd);background:#fef2f2}
+    .cmp-row{display:grid;grid-template-columns:1.6fr 1fr 1fr;border-bottom:1px solid var(--rule)}
+    .cmp-row:last-child{border-bottom:0}
+    .cmp-row>div{padding:15px 22px;font-size:14.5px;display:flex;align-items:center;gap:9px}
+    .cmp-row .feat{color:var(--ink);font-weight:500}
+    .cmp-row .them{color:var(--muted);background:#fbfbfc}
+    .cmp-row .us{color:var(--ink);background:#fff}
+    .x{color:#b9410f;font-weight:700}.chk{color:var(--green);font-weight:700}
+
+    /* ---- onboarding steps ---- */
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:38px}
+    .step{border:1px solid var(--rule);border-radius:var(--r);padding:26px 24px;background:#fff;
+      transition:.18s ease;position:relative}
+    .step:hover{border-color:var(--rule-strong);transform:translateY(-2px);
+      box-shadow:0 18px 40px -26px rgba(11,13,18,.3)}
+    .step .n{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:#fff;
+      background:var(--amd);width:30px;height:30px;border-radius:8px;display:flex;
+      align-items:center;justify-content:center;margin-bottom:18px}
+    .step h3{font-size:17px;font-weight:700;letter-spacing:-.01em}
+    .step p{font-size:14px;color:var(--body);margin-top:9px;line-height:1.6}
+    .step a{display:inline-flex;align-items:center;gap:6px;margin-top:16px;font-size:13.5px;
+      font-weight:600;color:var(--amd)}
+    .step a:hover{gap:9px}
+
+    /* ---- verification signature ---- */
+    .verify{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+    .passport{background:var(--panel);border-radius:16px;overflow:hidden;position:relative;
+      border:1px solid #1c2029;box-shadow:0 26px 56px -30px rgba(11,13,18,.5)}
+    .passport .scan{position:absolute;left:0;right:0;height:90px;pointer-events:none;
+      background:linear-gradient(180deg,transparent,rgba(52,209,127,.09),transparent);
+      animation:scan 3.4s ease-in-out infinite}
+    @keyframes scan{0%{transform:translateY(-90px)}100%{transform:translateY(360px)}}
+    .passport .ph{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;
+      border-bottom:1px solid rgba(255,255,255,.06)}
+    .passport .ph .t{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;
+      text-transform:uppercase;color:#7a828f}
+    .passport .body{padding:22px 20px;font-family:'JetBrains Mono',monospace;font-size:13px}
+    .passport .body .r{display:flex;justify-content:space-between;padding:5px 0;color:#8b929e}
+    .passport .body .r b{font-weight:500}
+    .passport .foot{padding:14px 20px;border-top:1px solid rgba(255,255,255,.06);
+      font-size:11.5px;color:#6b7280;line-height:1.6}
+
+    /* ---- honesty ---- */
+    .honesty{background:var(--panel);border-radius:var(--r);padding:34px 36px;color:#c9cdd6;
+      display:flex;gap:28px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .honesty p{max-width:52em;line-height:1.65;font-size:15.5px}
+    .honesty b{color:#fff}
+
+    /* ---- footer ---- */
+    footer{border-top:1px solid var(--rule);padding:32px 0}
+    .foot-in{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+      font-size:13px;color:var(--muted)}
+
+    @media(max-width:900px){
+      .hero,.prob,.verify{grid-template-columns:1fr;gap:40px}
+      .steps{grid-template-columns:1fr}
+      .cmp-head,.cmp-row{grid-template-columns:1.3fr .85fr .85fr}
+      .seal{position:static;margin-top:16px;min-width:0}
+      section{padding:56px 0}
+    }
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   </style>
 </head>
-<body class="bg-surface-900 text-gray-100 min-h-screen grid-bg antialiased">
-  <div class="max-w-[1240px] mx-auto px-5 sm:px-8">
+<body>
 
-    <!-- Nav -->
-    <nav class="flex items-center justify-between py-6">
-      <div class="flex items-center gap-2.5">
-        <span class="inline-block w-6 h-1.5 bg-amd rounded-full"></span>
-        <span class="font-black tracking-tight text-lg"><span class="text-white">HIP</span><span class="text-amd">nosis</span></span>
-      </div>
-      <div class="flex items-center gap-6 text-sm text-gray-400">
-        <a href="https://github.com/manuelpenazuniga/HIPnosis" class="link-underline hidden sm:inline hover:text-white transition-colors">Source</a>
-        <a href="dashboard/?run=run_bsw01a2" class="px-4 py-2 rounded-lg bg-amd text-white font-semibold hover:bg-red-600 transition-colors">Live demo →</a>
-      </div>
-    </nav>
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a href="#" class="brand"><span class="tick"></span><span>HIP<span class="red">nosis</span></span></a>
+      <nav class="nav-links">
+        <a class="plain" href="#how">How it works</a>
+        <a class="plain" href="#compare">vs. translation</a>
+        <a class="plain" href="https://github.com/manuelpenazuniga/HIPnosis">Source</a>
+        <a class="btn btn-red" href="dashboard/?run=run_bsw01a2">Launch demo →</a>
+      </nav>
+    </div>
+  </header>
 
-    <!-- Hero -->
-    <header class="grid lg:grid-cols-[1.15fr_1fr] gap-10 lg:gap-8 items-center pt-10 sm:pt-16 pb-20">
+  <!-- HERO -->
+  <div class="wrap">
+    <div class="hero">
       <div>
-        <div class="rise text-[11px] font-mono uppercase text-amd mb-6" style="animation-delay:.05s;letter-spacing:0.25em">
-          AMD Developer Hackathon · ACT II — Track 3
-        </div>
-        <h1 class="rise text-[2.7rem] sm:text-6xl font-black tracking-tight leading-[1.02]" style="animation-delay:.12s">
-          A CUDA port that<br>compiles can still be<br><span class="text-amd">silently wrong.</span>
-        </h1>
-        <p class="rise text-lg text-gray-400 mt-6 max-w-xl leading-relaxed" style="animation-delay:.2s">
-          <span class="font-mono text-gray-300">hipify</span> translates the syntax and stops. HIPnosis compiles on a
+        <div class="eyebrow">AMD Developer Hackathon · ACT II</div>
+        <h1>Port CUDA to AMD ROCm —<br>and <em>prove</em> it still<br>computes the same numbers.</h1>
+        <p class="lede">
+          HIPnosis is an autonomous agent. Give it a CUDA repository; it compiles on a
           real MI300X, drains every build error, catches the wavefront-64 bugs a textual
-          port ships in silence, and hands you a <span class="text-white font-semibold">proof you can verify yourself</span>.
+          port ships silently, and hands back a verified port with a proof you can check yourself.
         </p>
-        <div class="rise flex flex-wrap items-center gap-3 mt-8" style="animation-delay:.28s">
-          <a href="dashboard/?run=run_bsw01a2" class="px-6 py-3 rounded-xl bg-amd text-white font-bold hover:bg-red-600 transition-colors amd-glow">
-            Launch live demo →
-          </a>
-          <a href="https://github.com/manuelpenazuniga/HIPnosis" class="px-6 py-3 rounded-xl bg-white/5 text-gray-300 font-semibold border border-white/10 hover:bg-white/10 transition-colors">
-            Read the source
-          </a>
+        <div class="cta-row">
+          <a class="btn btn-red btn-lg" href="dashboard/?run=run_bsw01a2">Launch live demo →</a>
+          <a class="btn btn-ghost btn-lg" href="#how">How it works</a>
         </div>
-        <p class="rise text-xs text-gray-500 mt-5 font-mono" style="animation-delay:.34s">
-          387 tests · Gemma 3 27B local · ROCm · $0 API on the demo port
-        </p>
+        <div class="trust">387 tests · Gemma 3 27B local · ROCm 6.x · $0 API on the demo port</div>
       </div>
 
-      <!-- Firma: el Port Passport estampado -->
-      <div class="rise" style="animation-delay:.24s">
-        <div class="relative overflow-hidden rounded-2xl border border-white/10 bg-surface-800/80 backdrop-blur amd-glow">
-          <div class="stamp-scan absolute inset-x-0 h-24 bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent pointer-events-none"></div>
-          <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between">
-            <span class="text-[11px] font-mono uppercase tracking-widest text-gray-500">Port Passport</span>
-            <span class="px-2.5 py-1 rounded-md text-[11px] font-bold border border-emerald-500/40 bg-emerald-500/10 text-emerald-400">
-              <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 pulse-dot mr-1 align-middle"></span>VERIFIED
-            </span>
+      <div class="shot">
+        <div class="frame">
+          <div class="bar">
+            <i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+            <span class="u">hipnosis · live run — bsw-cuda</span>
           </div>
-          <div class="p-6 font-mono text-[13px] space-y-2.5">
-            <div class="flex justify-between gap-4"><span class="text-gray-500">repo</span><span class="text-gray-300 truncate">bsw-cuda · Smith-Waterman</span></div>
-            <div class="flex justify-between gap-4"><span class="text-gray-500">diff</span><span class="text-emerald-400">sha256:8b3f1a9…c10401</span></div>
-            <div class="flex justify-between gap-4"><span class="text-gray-500">verdict</span><span class="text-white">PASS · 8 → 0 errors</span></div>
-            <div class="flex justify-between gap-4"><span class="text-gray-500">wave64</span><span class="text-amber-400">2 correctness bugs caught</span></div>
-            <div class="flex justify-between gap-4"><span class="text-gray-500">target</span><span class="text-amd">gfx942 · MI300X</span></div>
+          <img src="dashboard/preview/dashboard.png" alt="HIPnosis dashboard: 8 build errors drained to 0, 100% resolved locally, 2 wave64 correctness bugs caught, verdict PASS on gfx942">
+        </div>
+        <div class="seal">
+          <div class="h">
+            <span class="tag">Port Passport</span>
+            <span class="v"><span class="dot"></span>VERIFIED</span>
           </div>
-          <div class="px-6 pb-5 pt-1 text-[11px] text-gray-500 leading-relaxed border-t border-white/5">
-            The demo recomputes <span class="text-gray-400 font-mono">sha256(diff)</span> in your browser.
-            Change one byte of the port and this seal reads <span class="text-red-400 font-semibold">TAMPERED</span>.
-          </div>
+          <div class="row"><span>diff</span><b class="mono" style="color:#34d17f">sha256:8b3f…c10401</b></div>
+          <div class="row"><span>verdict</span><b>PASS · 8→0</b></div>
+          <div class="row"><span>target</span><b style="color:#ff6b6b">gfx942</b></div>
         </div>
       </div>
-    </header>
-
-    <!-- Differentiators -->
-    <section class="grid sm:grid-cols-3 gap-4 pb-16">
-      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
-        <div class="text-amd font-mono text-xs mb-3">01 · ORACLE, NOT OPINION</div>
-        <h3 class="font-bold text-white mb-2">A real build loop</h3>
-        <p class="text-sm text-gray-400 leading-relaxed">Compiles on AMD silicon, measures every fix by the compiler, and reverts what doesn't help. Success is declared by the build and the numbers — never by asking an LLM.</p>
-      </div>
-      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
-        <div class="text-amber-400 font-mono text-xs mb-3">02 · THE SILENT BUG</div>
-        <h3 class="font-bold text-white mb-2">Wave64 divergence</h3>
-        <p class="text-sm text-gray-400 leading-relaxed">AMD wavefronts are 64 lanes, not 32. A <span class="font-mono text-gray-300">__ballot_sync(0xffffffff)</span> compiles clean and computes wrong. HIPnosis flags it statically — zero false positives on real kernels.</p>
-      </div>
-      <div class="rounded-2xl border border-white/8 bg-surface-800/50 p-6">
-        <div class="text-emerald-400 font-mono text-xs mb-3">03 · PAPERS AT THE BORDER</div>
-        <h3 class="font-bold text-white mb-2">The Port Passport</h3>
-        <p class="text-sm text-gray-400 leading-relaxed">Every run emits a hash-signed attestation of the diff, the verdict and the environment. Verifiable by anyone with <span class="font-mono text-gray-300">sha256sum</span> — no trust required.</p>
-      </div>
-    </section>
-
-    <!-- Honesty line -->
-    <section class="pb-20">
-      <div class="rounded-2xl border border-white/8 bg-gradient-to-r from-surface-800/60 to-transparent p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-        <p class="text-gray-300 leading-relaxed max-w-3xl">
-          <span class="text-white font-semibold">Radical honesty is the point.</span>
-          The demo replays a recorded run, and the badge always says so — <span class="font-mono text-amber-400">synthetic</span>,
-          <span class="font-mono text-gray-400">mock</span>, or <span class="font-mono text-emerald-400">live silicon</span>.
-          We never show a scripted terminal claiming a GPU result that didn't happen.
-        </p>
-        <a href="dashboard/?run=run_bsw01a2" class="whitespace-nowrap px-5 py-2.5 rounded-xl bg-amd text-white font-bold hover:bg-red-600 transition-colors self-start sm:self-auto">See it run →</a>
-      </div>
-    </section>
-
-    <footer class="border-t border-white/5 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-      <span>HIPnosis · Autonomous CUDA → ROCm porting · MIT</span>
-      <span class="font-mono">Built with Gemma on ROCm · AMD Developer Hackathon ACT II</span>
-    </footer>
+    </div>
   </div>
+
+  <!-- BUILT ON -->
+  <div class="strip">
+    <div class="wrap strip-in">
+      <span class="lab">Built on</span>
+      <span class="item">ROCm</span><span class="item">AMD Instinct MI300X</span>
+      <span class="item">Gemma 3 27B</span><span class="item">Fireworks AI</span>
+    </div>
+  </div>
+
+  <!-- PROBLEM -->
+  <div class="band">
+    <div class="wrap"><section style="padding-top:64px;padding-bottom:64px">
+      <div class="prob">
+        <div>
+          <div class="kicker">The bug a translator can't see</div>
+          <h2>A port that compiles can still be silently wrong.</h2>
+          <p class="sec-lede">
+            NVIDIA warps are 32 lanes. AMD wavefronts are <b>64</b>. Translate this line and it
+            compiles cleanly on an MI300X — then returns corrupted numbers, with no error and no crash.
+            HIPnosis is built to catch exactly this class of divergence, statically, before it ships.
+          </p>
+        </div>
+        <div class="code"><span class="c">// hipify translates it. hipcc accepts it. The result is wrong.</span><br>
+          <span class="k">__ballot_sync</span>(<span class="w">0xffffffff</span>, tid &lt; n);  <span class="c">// 32-bit mask on a 64-lane wavefront</span><br>
+          <span class="k">int</span> lane = tid <span class="w">% 32</span>;              <span class="c">// warp-size arithmetic, off by 2×</span><br><br>
+          <span class="g">// HIPnosis flags W01 · W05 → correctness, before verify.</span>
+        </div>
+      </div>
+    </section></div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="wrap"><section id="compare">
+    <div class="kicker">Translation is step one of five</div>
+    <h2>Most tools stop where the real work begins.</h2>
+    <p class="sec-lede">A translator hands you HIP source and calls it done. HIPnosis treats translation as a
+      single phase, then compiles, patches, runs and verifies on real hardware until the numbers match.</p>
+
+    <div class="cmp" style="margin-top:34px">
+      <div class="cmp-head">
+        <div class="t">Capability</div>
+        <div class="them">Translation tools</div>
+        <div class="us">HIPnosis</div>
+      </div>
+      <div class="cmp-row"><div class="feat">Translate CUDA → HIP syntax</div><div class="them"><span class="chk">✓</span> yes</div><div class="us"><span class="chk">✓</span> yes</div></div>
+      <div class="cmp-row"><div class="feat">Compile on a real MI300X, in a loop</div><div class="them"><span class="x">✕</span> scripted / offline</div><div class="us"><span class="chk">✓</span> deterministic loop</div></div>
+      <div class="cmp-row"><div class="feat">Fixes measured by the compiler, reverted if worse</div><div class="them"><span class="x">✕</span> none</div><div class="us"><span class="chk">✓</span> oracle-driven</div></div>
+      <div class="cmp-row"><div class="feat">Numerical parity vs. a reference (rtol/atol)</div><div class="them"><span class="x">✕</span> none</div><div class="us"><span class="chk">✓</span> per-run</div></div>
+      <div class="cmp-row"><div class="feat">Wave64 silent-correctness detection</div><div class="them"><span class="x">✕</span> not checked</div><div class="us"><span class="chk">✓</span> W01–W07</div></div>
+      <div class="cmp-row"><div class="feat">Verifiable, hash-signed provenance</div><div class="them"><span class="x">✕</span> round numbers</div><div class="us"><span class="chk">✓</span> Port Passport</div></div>
+      <div class="cmp-row"><div class="feat">Automated test suite</div><div class="them"><span class="x">✕</span> none published</div><div class="us"><span class="chk">✓</span> 387 tests</div></div>
+    </div>
+  </section></div>
+
+  <!-- ONBOARDING -->
+  <div class="band">
+    <div class="wrap"><section id="how">
+      <div class="kicker">See it yourself</div>
+      <h2>A verified port, in three steps.</h2>
+      <p class="sec-lede">The demo replays a recorded run of <b>bsw-cuda</b> (Smith-Waterman) end to end.
+        No install, no sign-up — everything below runs in your browser.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="n">1</div>
+          <h3>Watch the loop drain</h3>
+          <p>Eight compiler errors fall to zero across four iterations — each fix classified, applied as a git commit, and measured by the build.</p>
+          <a href="dashboard/?run=run_bsw01a2">Open the live run →</a>
+        </div>
+        <div class="step">
+          <div class="n">2</div>
+          <h3>Find the silent bugs</h3>
+          <p>Two wavefront-64 divergences flagged as <b>correctness</b> — the exact bugs a textual port compiles clean and ships broken.</p>
+          <a href="dashboard/?run=run_bsw01a2#wave64-section">Inspect wave64 →</a>
+        </div>
+        <div class="step">
+          <div class="n">3</div>
+          <h3>Verify the proof</h3>
+          <p>The Port Passport recomputes <span class="mono">sha256(diff)</span> in your browser. Tamper with one byte and the seal flips to <b>TAMPERED</b>.</p>
+          <a href="dashboard/?run=run_bsw01a2#passport-section">Check the passport →</a>
+        </div>
+      </div>
+    </section></div>
+  </div>
+
+  <!-- VERIFICATION SIGNATURE -->
+  <div class="wrap"><section>
+    <div class="verify">
+      <div>
+        <div class="kicker">Cross the border with papers</div>
+        <h2>Every port ships with a proof.</h2>
+        <p class="sec-lede">
+          Alongside the human-readable certificate, each run emits a hash-signed attestation —
+          the diff, the verdict, the environment, the source and final commits. It follows the
+          SLSA provenance model, and anyone can verify it with <span class="mono">sha256sum</span>.
+          No trust required, no vendor lock-in on the proof itself.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-red" href="dashboard/?run=run_bsw01a2#passport-section">Verify a passport →</a>
+        </div>
+      </div>
+      <div class="passport">
+        <div class="scan"></div>
+        <div class="ph"><span class="t">Port Passport</span>
+          <span style="font-size:11px;font-weight:700;color:#34d17f;border:1px solid rgba(52,209,127,.35);background:rgba(52,209,127,.1);border-radius:6px;padding:2px 9px">● VERIFIED</span></div>
+        <div class="body">
+          <div class="r"><span>repo</span><b style="color:#c9cdd6">bsw-cuda · Smith-Waterman</b></div>
+          <div class="r"><span>diff</span><b style="color:#34d17f">sha256:8b3f1a9…c10401</b></div>
+          <div class="r"><span>verdict</span><b style="color:#e9ecf1">PASS · 8 → 0 errors</b></div>
+          <div class="r"><span>wave64</span><b style="color:#f0b03e">2 correctness bugs caught</b></div>
+          <div class="r"><span>target</span><b style="color:#ff6b6b">gfx942 · MI300X</b></div>
+          <div class="r"><span>provenance</span><b style="color:#8b929e">SLSA-L1 · unsigned</b></div>
+        </div>
+        <div class="foot">Recomputed in your browser. Change one byte of the port and this seal reads <span style="color:#ff6b6b;font-weight:600">TAMPERED</span>.</div>
+      </div>
+    </div>
+  </section></div>
+
+  <!-- HONESTY -->
+  <div class="wrap" style="padding-bottom:72px">
+    <div class="honesty">
+      <p><b>Radical honesty is the point.</b> The demo replays a recorded run, and the badge always
+        says which mode you're in — <span class="mono" style="color:#f0b03e">synthetic</span>,
+        <span class="mono" style="color:#9aa0ab">mock</span>, or
+        <span class="mono" style="color:#34d17f">live silicon</span>. We never show a scripted
+        terminal claiming a GPU result that didn't happen.</p>
+      <a class="btn btn-red btn-lg" href="dashboard/?run=run_bsw01a2">See it run →</a>
+    </div>
+  </div>
+
+  <footer>
+    <div class="wrap foot-in">
+      <span>HIPnosis · Autonomous CUDA → ROCm porting · MIT</span>
+      <span class="mono">Built with Gemma on ROCm · AMD Developer Hackathon ACT II</span>
+    </div>
+  </footer>
+
 </body>
 </html>

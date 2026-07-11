@@ -89,6 +89,26 @@
   </style>
 </head>
 <body class="bg-surface-900 text-gray-100 min-h-screen">
+  <!-- Onboarding de primera visita: qué mirar en 20 segundos. Se muestra una vez
+       (localStorage) y es descartable (X, backdrop, Escape, "Watch the run"). -->
+  <div id="intro" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div class="glass rounded-2xl max-w-lg w-full p-7 relative border border-white/10">
+      <button id="intro-close" aria-label="Close" class="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors text-xl leading-none">&times;</button>
+      <div class="flex items-center gap-3 mb-1">
+        <div class="w-7 h-1 bg-amd rounded-full"></div>
+        <span class="text-xs font-semibold tracking-widest uppercase text-amd">A verified port, live</span>
+      </div>
+      <h2 class="text-2xl font-black tracking-tight mb-2">Three things to watch</h2>
+      <p class="text-sm text-gray-400 mb-5">This replays a real recorded port of <span class="font-mono text-gray-300">bsw-cuda</span> end to end — no install, nothing to click.</p>
+      <ol class="space-y-3 mb-6">
+        <li class="flex gap-3"><span class="flex-shrink-0 w-6 h-6 rounded-md bg-amd text-white text-xs font-bold font-mono flex items-center justify-center">1</span><span class="text-sm text-gray-300"><b class="text-white">The loop drains.</b> 8 compiler errors fall to 0 — each fix measured by the build.</span></li>
+        <li class="flex gap-3"><span class="flex-shrink-0 w-6 h-6 rounded-md bg-amber-500 text-black text-xs font-bold font-mono flex items-center justify-center">2</span><span class="text-sm text-gray-300"><b class="text-white">Wave64 bugs caught.</b> 2 silent correctness bugs a textual port ships broken.</span></li>
+        <li class="flex gap-3"><span class="flex-shrink-0 w-6 h-6 rounded-md bg-emerald-500 text-black text-xs font-bold font-mono flex items-center justify-center">3</span><span class="text-sm text-gray-300"><b class="text-white">Verify the passport.</b> Recompute the hash yourself; tamper one byte → <span class="text-red-400 font-semibold">TAMPERED</span>.</span></li>
+      </ol>
+      <button id="intro-go" class="w-full py-3 rounded-xl bg-amd text-white font-bold hover:bg-red-600 transition-colors">Watch the run →</button>
+    </div>
+  </div>
+
   <div class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
     <div id="loading-screen" class="flex flex-col items-center justify-center min-h-[60vh]">

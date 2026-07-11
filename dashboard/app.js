@@ -714,7 +714,7 @@ async function pollEvents() {
       setConn('done', 'run finished');
       fetchDiff();
       fetchCertificate();
-      fetchAttestation();
+      fetchAttestation().then(scrollToHash);
       return;
     }
   } catch (err) {
@@ -763,9 +763,10 @@ async function loadDemoData() {
       processEvents([events[i]]);
       await new Promise(r => setTimeout(r, pacing[events[i].ev] || 100));
     }
-    fetchDiff();
+    await fetchDiff();
     fetchCertificate();
-    fetchAttestation();
+    await fetchAttestation();
+    scrollToHash();
   } catch (err) {
     const msg = $('newrun-msg');
     msg.textContent = 'Could not connect to the API or load demo data.';
@@ -785,6 +786,33 @@ function initCertToggle() {
     state.certOpen = !state.certOpen;
     applyCertToggle();
   });
+}
+
+function initIntro() {
+  // Onboarding: se muestra una vez por navegador. Si el usuario llega con un
+  // deep-link a una sección concreta (#wave64-section, etc.), no interrumpimos.
+  const intro = $('intro');
+  if (!intro) return;
+  const dismiss = () => {
+    intro.classList.add('hidden');
+    try { localStorage.setItem('hipnosis_intro_seen', '1'); } catch (e) { /* */ }
+  };
+  const seen = (() => { try { return localStorage.getItem('hipnosis_intro_seen'); } catch (e) { return null; } })();
+  if (!seen && !window.location.hash) intro.classList.remove('hidden');
+  $('intro-close').addEventListener('click', dismiss);
+  $('intro-go').addEventListener('click', dismiss);
+  intro.addEventListener('click', (e) => { if (e.target === intro) dismiss(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dismiss(); });
+}
+
+function scrollToHash() {
+  // Deep-links del onboarding de la landing (#wave64-section, #passport-section).
+  // Las secciones aparecen recién cuando el run las revela, así que scrolleamos
+  // al final del replay, no al cargar.
+  const hash = window.location.hash;
+  if (!hash) return;
+  const el = document.querySelector(hash);
+  if (el && !el.classList.contains('hidden')) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function initPassport() {
@@ -921,6 +949,7 @@ async function init() {
   initDownload();
   initNewRun();
   initPassport();
+  initIntro();
   $('run-select').addEventListener('change', (e) => {
     if (e.target.value && e.target.value !== state.runId) {
       window.location.search = `?run=${encodeURIComponent(e.target.value)}`;
