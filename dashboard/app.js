@@ -378,6 +378,52 @@ function renderFixes() {
   revealSection('fixes-section');
 }
 
+function renderResultBanner() {
+  // QW1: el "so what" arriba. Se puebla cuando el run llega a un estado final,
+  // con el veredicto + los números que importan (todo desde state, F-17).
+  const done = ['DONE', 'DONE_PARTIAL', 'FAILED'].includes(state.currentPhase);
+  if (!done && !state.verify) return;
+  const card = $('result-card');
+
+  const r = state.report;
+  const initial = r ? r.errors_initial : (state.builds[0]?.errors ?? null);
+  const current = state.builds.length ? state.builds[state.builds.length - 1].errors : null;
+  const wave = r ? (r.wave64_findings || state.wave64.length) : state.wave64.length;
+  const totalFixes = r ? r.fixes_deterministic + r.fixes_local + r.fixes_remote : 0;
+  const localPct = r && totalFixes > 0
+    ? Math.round(((r.fixes_deterministic + r.fixes_local) / totalFixes) * 100) : null;
+
+  let verdict, vcls, border, bg;
+  if (state.failed) {
+    verdict = 'FAILED'; vcls = 'text-red-400'; border = 'border-red-500/40'; bg = 'bg-red-500/5';
+  } else if (state.loopDone && state.loopDone.success === false) {
+    verdict = 'DONE · PARTIAL'; vcls = 'text-amber-400'; border = 'border-amber-500/40'; bg = 'bg-amber-500/5';
+  } else if (state.verify && state.verify.verdict === 'PASS') {
+    verdict = 'PASS'; vcls = 'text-emerald-400'; border = 'border-emerald-500/40'; bg = 'bg-emerald-500/5';
+  } else if (state.verify && state.verify.verdict === 'FAIL') {
+    verdict = 'FAIL'; vcls = 'text-red-400'; border = 'border-red-500/40'; bg = 'bg-red-500/5';
+  } else {
+    verdict = state.verify ? state.verify.verdict : 'DONE'; vcls = 'text-gray-300'; border = 'border-white/10'; bg = 'bg-white/5';
+  }
+
+  const stat = (label, value, cls = 'text-white') =>
+    `<div class="flex flex-col"><span class="text-[10px] uppercase tracking-wider text-gray-500">${label}</span><span class="text-lg font-bold ${cls} font-mono">${value}</span></div>`;
+  let stats = '';
+  if (initial !== null && current !== null) stats += stat('Build errors', `${initial} → ${current}`, current === 0 ? 'text-emerald-400' : 'text-white');
+  if (wave) stats += stat('Wave64 caught', wave, 'text-amber-400');
+  if (localPct !== null) stats += stat('Resolved locally', `${localPct}%`, 'text-emerald-400');
+  if (state.attestation) stats += stat('Passport', 'verifiable', 'text-emerald-400');
+
+  card.className = `rounded-2xl p-5 sm:p-6 border ${border} ${bg} flex flex-col sm:flex-row sm:items-center gap-x-8 gap-y-4`;
+  card.innerHTML = `
+    <div class="flex items-center gap-4 sm:pr-8 sm:border-r border-white/10">
+      <span class="text-4xl sm:text-5xl font-black ${vcls}">${escapeHtml(verdict)}</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-3">${stats}</div>`;
+  $('result-banner').classList.remove('hidden');
+  revealSection('result-banner');
+}
+
 function renderVerdict() {
   const el = $('verdict');
   const detail = $('verdict-detail');
@@ -400,6 +446,7 @@ function renderVerdict() {
   }
   detail.textContent = detailText;
   revealSection('verdict-section');
+  renderResultBanner();
 }
 
 function renderOutcome() {
@@ -421,7 +468,7 @@ function renderOutcome() {
   if (needsHuman.length > 0) {
     $('outcome-section').classList.remove('hidden');
     const items = needsHuman.map(s =>
-      `<li class="font-mono text-xs text-gray-300 py-1 px-2 bg-white/[0.03] rounded-md">${escapeHtml(String(s))}</li>`).join('');
+      `<li class="font-mono text-xs text-gray-300 py-1 px-2 bg-white/5 rounded-md">${escapeHtml(String(s))}</li>`).join('');
     card.className = 'glass rounded-2xl p-6 border-l-4 border-l-amber-500';
     card.innerHTML = `
       <h2 class="text-lg font-bold text-amber-300 mb-1">Needs human attention</h2>
@@ -560,6 +607,7 @@ function renderPassport() {
   $('passport-section').classList.remove('hidden');
   revealSection('passport-section');
   verifyPassport();
+  renderResultBanner();   // suma el stat "Passport verifiable" al banner superior
 }
 
 async function fetchAttestation() {
@@ -632,6 +680,7 @@ function processEvent(ev) {
     case 'failed':
       state.failed = { reason: ev.reason, exc_type: ev.exc_type };
       renderOutcome();
+      renderResultBanner();
       break;
     case 'build_loop.done':
       state.loopDone = ev;
@@ -645,6 +694,7 @@ function processEvent(ev) {
       state.report = ev;
       renderHeroMetrics();
       renderFixes();
+      renderResultBanner();
       break;
     default:
       break;

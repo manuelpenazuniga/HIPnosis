@@ -75,7 +75,9 @@
     ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 
-    .section-reveal { opacity: 0; }
+    /* QW4: una sección aún no revelada NO reserva espacio — sin huecos vacíos
+       durante el drip. Aparece (con animación) recién cuando su dato llega. */
+    .section-reveal:not(.visible) { display: none; }
     .section-reveal.visible { opacity: 1; animation: slide-up 0.5s ease-out forwards; }
 
     /* Audit H13: respetar la preferencia de movimiento reducido del sistema. */
@@ -216,9 +218,16 @@
         </div>
       </header>
 
+      <!-- QW1: el "so what" arriba — resumen del resultado cuando el run termina. -->
+      <section id="result-banner" class="section-reveal hidden">
+        <div id="result-card" class="rounded-2xl p-5 sm:p-6 border flex flex-col sm:flex-row sm:items-center gap-x-8 gap-y-4"></div>
+      </section>
+
       <section id="timeline-section" class="section-reveal">
-        <div class="glass rounded-2xl p-6">
-          <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500 mb-4">Pipeline Phases</h2>
+        <div class="glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-600">Pipeline Phases</h2>
+          </div>
           <div id="timeline" class="flex flex-wrap gap-2"></div>
         </div>
       </section>
@@ -318,10 +327,10 @@
       </section>
 
       <section id="passport-section" class="section-reveal hidden">
-        <div class="glass rounded-2xl overflow-hidden border border-white/5">
+        <div class="glass rounded-2xl overflow-hidden border border-emerald-500/20 border-l-4 border-l-emerald-500">
           <div class="px-6 py-4 border-b border-white/5 flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">Port Passport</h2>
+              <h2 class="text-sm font-semibold uppercase tracking-wider text-emerald-400">Port Passport</h2>
               <p class="text-xs text-gray-500 mt-0.5">Cryptographically verifiable provenance — cross the border with papers</p>
             </div>
             <div id="passport-badge" class="px-3 py-1.5 rounded-lg text-xs font-bold border">…</div>
