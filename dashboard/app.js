@@ -756,12 +756,15 @@ async function loadDemoData() {
       return ev;
     });
     showApp();
-    // Pausas por tipo de evento: la reproducción respira como un run real
-    // (compilar tarda; clasificar es instantáneo).
-    const pacing = { phase: 350, build: 500, verify: 400 };
+    // Deep-link (#wave64-section, #passport-section desde el onboarding): el
+    // usuario quiere VER esa sección, no esperar el replay — renderizamos todo
+    // al instante y scrolleamos. Sin hash, la reproducción respira como un run
+    // real (compilar tarda; clasificar es instantáneo).
+    const deepLink = !!window.location.hash;
+    const pacing = deepLink ? {} : { phase: 350, build: 500, verify: 400 };
     for (let i = 0; i < events.length; i++) {
       processEvents([events[i]]);
-      await new Promise(r => setTimeout(r, pacing[events[i].ev] || 100));
+      if (!deepLink) await new Promise(r => setTimeout(r, pacing[events[i].ev] || 100));
     }
     await fetchDiff();
     fetchCertificate();

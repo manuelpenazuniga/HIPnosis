@@ -165,6 +165,36 @@
     .foot-in{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
       font-size:13px;color:var(--muted)}
 
+    /* ---- pipeline flow diagram (signature) ---- */
+    .flow{max-width:660px;margin:44px auto 0}
+    .flow-io{display:flex;align-items:center;gap:12px;justify-content:center;
+      font-family:'JetBrains Mono',monospace;font-size:12.5px;letter-spacing:.02em;
+      padding:14px 20px;border:1px dashed var(--rule-strong);border-radius:10px;
+      background:#fff;color:var(--muted)}
+    .flow-io b{color:var(--ink);font-weight:600}
+    .flow-io.out{border-style:solid;border-color:var(--green);background:var(--green-bg);color:#0d5c34}
+    .flow-io.out b{color:#0d5c34}
+    .arrow{display:flex;flex-direction:column;align-items:center;height:46px;position:relative}
+    .arrow::before{content:"";width:2px;flex:1;background:linear-gradient(var(--rule-strong),var(--amd))}
+    .arrow::after{content:"";position:absolute;bottom:1px;width:12px;height:12px;
+      border-right:2.5px solid var(--amd);border-bottom:2.5px solid var(--amd);
+      transform:rotate(45deg)}
+    .node{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px;
+      border:1px solid var(--rule);border-radius:14px;background:#fff;padding:18px 20px;
+      transition:.18s ease}
+    .node:hover{border-color:var(--rule-strong);box-shadow:0 16px 40px -26px rgba(11,13,18,.3)}
+    .node .idx{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;
+      justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:#fff}
+    .node .mid .tag{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.13em;
+      text-transform:uppercase;color:var(--faint)}
+    .node .mid h3{font-size:16.5px;font-weight:700;letter-spacing:-.01em;margin:3px 0 3px}
+    .node .mid p{font-size:13.5px;color:var(--body);line-height:1.5}
+    .node .mid p .mono{color:var(--ink)}
+    .node .go{font-size:13px;font-weight:600;color:var(--amd);white-space:nowrap;display:inline-flex;gap:5px;align-items:center}
+    .node:hover .go{gap:8px}
+    .node.n1 .idx{background:var(--amd)} .node.n2 .idx{background:#c78200} .node.n3 .idx{background:var(--green)}
+    @media(max-width:560px){.node{grid-template-columns:auto 1fr;gap:14px}.node .go{grid-column:2;justify-self:start;margin-top:4px}}
+
     @media(max-width:900px){
       .hero,.prob,.verify{grid-template-columns:1fr;gap:40px}
       .steps{grid-template-columns:1fr}
@@ -290,25 +320,44 @@
       <p class="sec-lede">The demo replays a recorded run of <b>bsw-cuda</b> (Smith-Waterman) end to end.
         No install, no sign-up — everything below runs in your browser.</p>
 
-      <div class="steps">
-        <div class="step">
-          <div class="n">1</div>
-          <h3>Watch the loop drain</h3>
-          <p>Eight compiler errors fall to zero across four iterations — each fix classified, applied as a git commit, and measured by the build.</p>
-          <a href="dashboard/?run=run_bsw01a2">Open the live run →</a>
-        </div>
-        <div class="step">
-          <div class="n">2</div>
-          <h3>Find the silent bugs</h3>
-          <p>Two wavefront-64 divergences flagged as <b>correctness</b> — the exact bugs a textual port compiles clean and ships broken.</p>
-          <a href="dashboard/?run=run_bsw01a2#wave64-section">Inspect wave64 →</a>
-        </div>
-        <div class="step">
-          <div class="n">3</div>
-          <h3>Verify the proof</h3>
-          <p>The Port Passport recomputes <span class="mono">sha256(diff)</span> in your browser. Tamper with one byte and the seal flips to <b>TAMPERED</b>.</p>
-          <a href="dashboard/?run=run_bsw01a2#passport-section">Check the passport →</a>
-        </div>
+      <div class="flow">
+        <div class="flow-io"><b>INPUT</b> · a CUDA repository URL</div>
+        <div class="arrow"></div>
+
+        <a class="node n1" href="dashboard/?run=run_bsw01a2">
+          <div class="idx">1</div>
+          <div class="mid">
+            <div class="tag">Phase · Build loop</div>
+            <h3>Watch the loop drain</h3>
+            <p>8 compiler errors fall to 0 across 4 iterations — each fix classified, committed, and measured by the build.</p>
+          </div>
+          <span class="go">Open&nbsp;→</span>
+        </a>
+        <div class="arrow"></div>
+
+        <a class="node n2" href="dashboard/?run=run_bsw01a2#wave64-section">
+          <div class="idx">2</div>
+          <div class="mid">
+            <div class="tag">Phase · Static analysis</div>
+            <h3>Find the silent bugs</h3>
+            <p>2 wavefront-64 divergences flagged <b>correctness</b> — the exact bugs a textual port compiles clean and ships broken.</p>
+          </div>
+          <span class="go">Inspect&nbsp;→</span>
+        </a>
+        <div class="arrow"></div>
+
+        <a class="node n3" href="dashboard/?run=run_bsw01a2#passport-section">
+          <div class="idx">3</div>
+          <div class="mid">
+            <div class="tag">Phase · Verify</div>
+            <h3>Verify the proof</h3>
+            <p>The Port Passport recomputes <span class="mono">sha256(diff)</span> in your browser. Tamper one byte → <b>TAMPERED</b>.</p>
+          </div>
+          <span class="go">Check&nbsp;→</span>
+        </a>
+        <div class="arrow"></div>
+
+        <div class="flow-io out">✓&nbsp; <b>OUTPUT</b> · a verified ROCm port + a Port Passport</div>
       </div>
     </section></div>
   </div>
