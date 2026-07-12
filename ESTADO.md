@@ -159,3 +159,16 @@ Respuesta: index.html landing AMD (tesis 'a port that compiles can still be sile
   backend real queda en MI300X, honesto). docs/DEPLOY.md. Verificado e2e local sin backend: landing OK,
   demo completa (loop→wave64→diff→PASS→cert→passport) + ciclo TAMPERED↔VERIFIED. Deploy lo dispara el humano.
 ====================================================================
+====================================================================
+🛡️ HIPnosis Guard (wow #3, GPU-independiente): gate estatico de portabilidad para CI.
+core/guard.py: CLI (python -m core.guard) que reusa el detector wave64 REAL (W01-W07) +
+  scan de CUDA residual (include/API/launch) + regla WARP32-DEFINE. Anotaciones nativas de
+  GitHub Actions (::error file=,line=::) en CI; reporte legible en consola; exit!=0 si hay
+  correctness (bloquea merge). --fail-on configurable. 6 tests (test_guard.py). Verificado en
+  vivo: limpio->exit 0, WARP_SIZE 32 + __ballot_sync(0xffffffff)->exit 1 con anotaciones.
+Integracion producto: ship escribe .github/workflows/hipnosis-guard.yml en el repo porteado
+  (el PR incluye el gate — 'no solo te migro, evito que vuelvas a quedar locked-in'). Verificado
+  e2e (mock pipeline -> workflow emitido). Template en orchestrator/templates/hipnosis-guard.yml.
+Dogfood: .github/workflows/hipnosis-guard.yml del propio repo lintea examples/guard/ (kernel HIP
+  limpio, pasa). docs/hipnosis-guard.md. README con seccion + roadmap actualizado. 393 tests.
+====================================================================

@@ -1,0 +1,23 @@
+# HIPnosis Guard — gate estático de portabilidad (corre en el propio repo).
+# Lintea los ejemplos limpios: si alguien reintroduce CUDA o un supuesto warp32,
+# el check falla. Es la misma herramienta que HIPnosis emite en los repos porteados.
+name: HIPnosis Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install pydantic
+      - name: Run HIPnosis Guard
+        working-directory: orchestrator
+        run: python -m core.guard --fail-on correctness ../examples/guard

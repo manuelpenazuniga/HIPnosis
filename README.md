@@ -6,7 +6,7 @@
 
 **Paste a CUDA repo URL. Get back a verified, compiled, numerically-checked ROCm port — with a certificate to prove it.**
 
-[![Tests](https://img.shields.io/badge/tests-370%20passing-brightgreen)](orchestrator/tests)
+[![Tests](https://img.shields.io/badge/tests-393%20passing-brightgreen)](orchestrator/tests)
 [![ROCm](https://img.shields.io/badge/ROCm-6.x%20%7C%20MI300X-ED1C24)](https://www.amd.com/en/products/software/rocm.html)
 [![Gemma 3](https://img.shields.io/badge/LLM-Gemma%203%2027B%20local-4285F4)](https://huggingface.co/google/gemma-3-27b-it)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
@@ -155,6 +155,18 @@ Every run emits an in-toto/SLSA-inspired attestation with SHA-256 digests of the
 
 The dashboard recomputes `sha256(diff)` **in your browser** and compares it to the attestation — a green **`PASSPORT VERIFIED`** badge. Flip a single byte of the port and it turns **`TAMPERED`**. No blockchain, no trust-me: the hash either matches or it doesn't. (We claim SLSA **L1** — honest provenance of inputs and build; not L2, because it isn't signed yet.)
 
+## 🛡️ HIPnosis Guard — stay migrated
+
+A port is step one. HIPnosis also ships **`.github/workflows/hipnosis-guard.yml`** into your PR: a static CI gate that runs the *same* wavefront-64 detector on every future change and **blocks** anyone who reintroduces CUDA or a 32-lane assumption.
+
+```
+  ✕ kernel.hip:13  [W01]           32-bit mask on a 64-lane wavefront
+  ✕ kernel.hip:2   [WARP32-DEFINE] hardcoded warp size of 32
+  ✕ Merge blocked: portability regressions reintroduced.
+```
+
+No GPU required — it's pure static analysis. Add `#define WARP_SIZE 32` to a ported repo, open a PR, and the check fails on the exact line. Details in [`docs/hipnosis-guard.md`](docs/hipnosis-guard.md); run it with `python -m core.guard <paths>`.
+
 ## 🏗 Architecture
 
 ```
@@ -173,7 +185,7 @@ The dashboard recomputes `sha256(diff)` **in your browser** and compares it to t
 
 - **Zero build steps, zero frameworks**: the dashboard is static HTML + vanilla JS with all assets vendored — it works fully offline.
 - **Three oracle modes**: `real` (GPU), `mock` (fixtures — the whole pipeline develops and tests without hardware), `replay` (recorded traces — how judges run it).
-- **370 automated tests** across every layer: error parsing, patching, wave64 detection, taxonomy, parity, the loop itself.
+- **393 automated tests** across every layer: error parsing, patching, wave64 detection, taxonomy, parity, the loop itself.
 
 ## 🗺 Status & roadmap
 
@@ -182,7 +194,8 @@ The dashboard recomputes `sha256(diff)` **in your browser** and compares it to t
 - ✅ Live dashboard with honest observability (mode badges, connection state, failure causes)
 - 🔜 Real-silicon M0 run on MI300X (AMD Developer Cloud) — replaces the synthetic replay with a recorded trace
 - 🔜 Performance benchmarking (`rocprof`) in the certificate: "compiles" ≠ "performs"
-- 🔭 Multi-repo fleets, CMake support, CI integration ("port regression bot")
+- ✅ HIPnosis Guard — CI gate that blocks CUDA/warp32 regressions on future PRs
+- 🔭 Multi-repo fleets, CMake support, performance regression thresholds
 
 ## 🙌 Built for the AMD Developer Hackathon: ACT II
 

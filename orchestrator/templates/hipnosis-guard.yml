@@ -1,0 +1,31 @@
+# HIPnosis Guard — added to your repository by HIPnosis after a verified port.
+#
+# It runs on every pull request and blocks changes that reintroduce CUDA or
+# 32-lane (warp) assumptions — the silent-correctness bugs HIPnosis just removed.
+# "We don't only migrate you; we keep you migrated."
+#
+# It's the same static analyzer (wave64 W01–W07 + residual-CUDA scan) that
+# produced your Port Passport. No GPU required.
+name: HIPnosis Guard
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch HIPnosis Guard
+        run: |
+          git clone --depth 1 https://github.com/manuelpenazuniga/HIPnosis.git /tmp/hipnosis
+          pip install pydantic
+      - name: Run HIPnosis Guard
+        run: |
+          PYTHONPATH=/tmp/hipnosis/orchestrator \
+            python -m core.guard --fail-on correctness .

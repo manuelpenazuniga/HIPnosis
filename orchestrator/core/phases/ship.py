@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from pathlib import Path
 from typing import Any, Optional
 
 from core.config import Config
@@ -430,6 +431,23 @@ def ship(
             bytes=len(md.encode("utf-8")),
             verdict=report_data.verify_verdict,
         )
+
+    # --- HIPnosis Guard: dejar el gate de CI en el repo porteado ----------
+    # "No solo te migro; evito que vuelvas a quedar locked-in." El PR incluye
+    # el workflow que corre el mismo detector wave64 en cada cambio futuro.
+    try:
+        _templates = Path(__file__).resolve().parent.parent.parent / "templates"
+        guard_src = _templates / "hipnosis-guard.yml"
+        if guard_src.is_file():
+            wf_dir = os.path.join(repo_dir, ".github", "workflows")
+            os.makedirs(wf_dir, exist_ok=True)
+            guard_dst = os.path.join(wf_dir, "hipnosis-guard.yml")
+            with open(guard_dst, "w", encoding="utf-8") as gf:
+                gf.write(guard_src.read_text(encoding="utf-8"))
+            if trace is not None:
+                trace.emit("ship.guard", path=guard_dst)
+    except Exception:  # noqa: BLE001 — azúcar (F-13b): nunca tumba el ship
+        pass
 
     out_dir = os.path.join(repo_dir, OUT_SUBDIR)
 
