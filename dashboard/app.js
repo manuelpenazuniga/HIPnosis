@@ -794,6 +794,10 @@ async function loadDemoData() {
   } else {
     state.mode = 'replay';   // el trace (oracle_mode=mock) → "REPLAY · synthetic demo"
     setConn('done', 'replay — recorded run');
+    // Sitio estático: el "New port" no puede correr repos (no hay backend).
+    // Ajustamos la nota para que quede claro de entrada.
+    const note = $('newrun-note');
+    if (note) note.innerHTML = 'Hosted demo — this replays a recorded run of <b class="text-gray-400">bsw-cuda</b>. To port your own repository, run HIPnosis locally with a GPU (see the README).';
   }
   try {
     const resp = await fetch('../fixtures/demo-run.jsonl');
@@ -900,6 +904,14 @@ function initNewRun() {
     e.preventDefault();
     const repoUrl = input.value.trim();
     if (!repoUrl) return;
+    // Demo estático (Vercel/Pages, sin orquestador): no hay backend que reciba
+    // el POST — sería un 404 confuso. Explicamos honestamente en vez de fingir.
+    if (!state.apiAlive) {
+      msg.innerHTML = 'This is the <b class="text-gray-200">hosted demo</b> — it replays a recorded run and has no live orchestrator, so it can\'t port an arbitrary repo. To port your own, run HIPnosis locally with an AMD GPU: <a href="https://github.com/manuelpenazuniga/HIPnosis#-quickstart-no-gpu-required" class="text-amd underline hover:text-red-400">see the quickstart</a>.';
+      msg.className = 'text-xs mt-2 px-2 text-amber-400 leading-relaxed';
+      msg.classList.remove('hidden');
+      return;
+    }
     btn.disabled = true;
     btn.textContent = 'Starting…';
     msg.classList.add('hidden');
@@ -909,6 +921,13 @@ function initNewRun() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repo_url: repoUrl }),
       });
+      if (resp.status === 403) {
+        msg.textContent = 'This deployment only ports the curated demo repositories (bsw-cuda, softmax-cuda, scan-cuda).';
+        msg.className = 'text-xs mt-2 px-2 text-amber-400';
+        msg.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = 'Port it →';
+        return;
+      }
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const run = await resp.json();
       window.location.search = `?run=${encodeURIComponent(run.id)}`;

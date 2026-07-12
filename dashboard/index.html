@@ -120,6 +120,11 @@
 
     <div id="app" class="hidden space-y-8">
 
+      <a href="../" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-white transition-colors -mb-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        Back to home
+      </a>
+
       <header class="relative">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
           <div>
@@ -127,9 +132,11 @@
               <div class="w-8 h-1 bg-amd rounded-full"></div>
               <span class="text-xs font-semibold tracking-widest uppercase text-amd">AMD Developer Hackathon</span>
             </div>
+            <a href="../" class="inline-block hover:opacity-80 transition-opacity" title="Back to home">
             <h1 class="text-5xl sm:text-6xl font-black tracking-tight">
               <span class="text-white">HIP</span><span class="text-amd">nosis</span>
             </h1>
+            </a>
             <p class="text-gray-400 mt-2 text-lg">Autonomous CUDA → ROCm/AMD porting agent</p>
           </div>
           <div class="flex items-center gap-4">
@@ -165,7 +172,7 @@
             </button>
           </form>
           <p id="newrun-msg" class="hidden text-xs mt-2 px-2"></p>
-          <p class="text-xs text-gray-500 mt-2 px-2">Paste a CUDA repo URL — HIPnosis clones it, ports it to HIP, drains build errors and verifies numerical parity on AMD.</p>
+          <p id="newrun-note" class="text-xs text-gray-500 mt-2 px-2">Paste a CUDA repo URL — HIPnosis clones it, ports it to HIP, drains build errors and verifies numerical parity on AMD.</p>
         </div>
 
         <div id="scan-strip" class="hidden glass rounded-2xl px-5 py-3 mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400"></div>
