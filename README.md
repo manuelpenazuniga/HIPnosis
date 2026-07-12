@@ -128,6 +128,10 @@ int laneId = threadIdx.x % 32;                               // warp-size arithm
 
 HIPnosis ships a static analyzer with **7 wave64 divergence patterns** (W01–W07: 32-bit ballot masks, truncated popcounts, hardcoded warp widths, lane arithmetic, cooperative-group partitions...), each with a severity rating and a fixed explanation. Validated against real HeCBench kernels with **zero false positives** — every finding in the screenshot above is a genuine correctness bug that a textual port would have shipped.
 
+<img src="assets/wave64-diff.png" alt="Wave64 Divergence Detection panel flagging W01/W02 correctness bugs, and the Code Transformation diff showing the 32-bit ballot mask rewritten to 64 bits" width="100%">
+
+*The detector flags the bug; the loop fixes it. Above: the two W01/W02 findings in `kernel.cu:13`, and the actual diff — `__ballot_sync(0xffffffff)` rewritten to a 64-bit mask, `threadIdx.x % 32` replaced with runtime `warpSize`.*
+
 This is the difference between *translating text* and *migrating semantics*.
 
 ## 📋 Results — every run, including the honest exits
@@ -145,6 +149,10 @@ replay):
 **21 build errors drained to zero across three repos, 100% locally, $0.00 cloud
 spend** — and 2 silent wavefront-64 correctness bugs in `bsw` that a textual
 port would have shipped.
+
+<img src="assets/burndown-fixes.png" alt="Error Burndown chart draining 8 → 5 → 2 → 0 across four iterations, and the Fixes Applied ledger listing each error class with its tier and commit" width="100%">
+
+*Auditable, not anecdotal: the burndown (8 → 5 → 2 → 0) and the fix ledger — every error class tied to the tier that fixed it (`deterministic` / `local`) and the exact commit.*
 
 And when a repo *can't* be fully fixed, that's not hidden: the loop exits
 honestly to **`DONE_PARTIAL`** and the certificate lists what remains as
@@ -204,6 +212,10 @@ Every run emits an in-toto/SLSA-inspired attestation with SHA-256 digests of the
 ```
 
 The dashboard recomputes `sha256(diff)` **in your browser** and compares it to the attestation — a green **`PASSPORT VERIFIED`** badge. Flip a single byte of the port and it turns **`TAMPERED`**. No blockchain, no trust-me: the hash either matches or it doesn't. (We claim SLSA **L1** — honest provenance of inputs and build; not L2, because it isn't signed yet.)
+
+<img src="assets/passport.png" alt="Port Passport panel: PASSPORT VERIFIED badge, diff and certificate SHA-256 digests, verdict PASS 8→0 errors, gfx942 target, and the Tamper demo button" width="100%">
+
+*The passport in the dashboard: digests, builder, verdict and target — with a **Tamper demo** button that flips one byte so you can watch the seal break, and re-verify to watch it heal.*
 
 ## 🛡️ HIPnosis Guard — stay migrated
 
