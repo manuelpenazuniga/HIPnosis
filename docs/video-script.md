@@ -9,8 +9,9 @@
 > abierto en una pestaña. Grabá a 1080p. Recomendado: OBS o QuickTime.
 >
 > **Nota de honestidad:** el video usa el modo **replay** (una corrida grabada), que es
-> como los jueces lo reproducen sin GPU. Cuando exista la corrida real de M0 en MI300X,
-> `scripts/record_fixture.sh` reemplaza el trace y el badge pasa a "recorded run".
+> como los jueces lo reproducen sin GPU. El smoke test **M0 en una MI300X real ya pasó**
+> (toolchain ROCm + pipeline GPU verificados end-to-end). Si se regraba una corrida real
+> en el droplet, `scripts/record_fixture.sh` la congela y el badge pasa a "recorded run".
 
 ---
 
@@ -30,8 +31,8 @@
 ## 0:30 – 1:00 · Qué es HIPnosis (landing)
 
 **🎥 MOSTRAR:** Abrí la landing (la home del sitio). Scroll lento por el hero:
-el título "Port CUDA to AMD ROCm — and prove it", el screenshot del dashboard,
-y el sello **PORT PASSPORT · VERIFIED**.
+el título "Port CUDA to AMD ROCm — and **prove** it still computes the same
+numbers", el screenshot del dashboard, y el sello **PORT PASSPORT · VERIFIED**.
 
 **🎙️ DECIR:**
 > "HIPnosis is an autonomous agent. You give it a CUDA repository; it compiles the
@@ -80,9 +81,11 @@ difficulty, target GPU **gfx942**).
 ## 2:40 – 3:40 · El build loop (el corazón)
 
 **🎥 MOSTRAR:** Señalá las tarjetas de métricas: **Errors Resolved 8 → 0**,
-**Resolved Locally 100%**, **Cloud API Cost $0.00**. Después mostrá el **Error
-Burndown** (8 → 5 → 2 → 0) y la tabla **Fixes Applied** (E01, E02, E05 con sus
-tiers y commits).
+**Resolved Locally 100%**, **Cloud API Cost $0.00**. Cuando el run termina, bajo
+las métricas aparece la **banda verde PASS** (build errors 8→0, wave64 2, 100%
+local, passport verifiable) — dejala respirar un segundo. Después scroll abajo
+al **Error Burndown** (8 → 5 → 2 → 0) y la tabla **Fixes Applied** (E01, E02,
+E05 con sus tiers y commits).
 
 **🎙️ DECIR:**
 > "Here's the core loop. It compiles on the GPU, and for every error it parses the
@@ -113,8 +116,9 @@ y la verde con el fix de 64 bits.
 
 ## 4:30 – 5:00 · Verificación numérica + certificado
 
-**🎥 MOSTRAR:** Scroll al veredicto grande **PASS**. Después al **Port Certificate**
-(expandido): mostrá el resumen ejecutivo y la tabla de inventario.
+**🎥 MOSTRAR:** Scroll al panel **Verification Verdict** con el **PASS** grande.
+Después al **Port Certificate** (expandido): mostrá el resumen ejecutivo y la
+tabla de inventario.
 
 **🎙️ DECIR:**
 > "Success isn't declared by an AI. HIPnosis runs the ported binary and compares its
@@ -153,9 +157,11 @@ Terminá en el logo HIPnosis.
 
 ---
 
-## 📋 Apéndice — comandos para el segmento de GPU real (opcional, si grabás M0)
+## 📋 Apéndice — comandos para el segmento de GPU real (opcional)
 
-Si querés incluir la corrida real en MI300X (tras aprobar los créditos de AMD):
+M0 ya pasó, pero no quedó material grabado. Si querés footage de la corrida real
+en MI300X, restaurá el snapshot del droplet (~$2/hr mientras exista — snapshot +
+destroy al terminar, regla de costo de `docs/M0-smoke-test.md`) y corré:
 
 ```bash
 cp orchestrator/.env.example orchestrator/.env
