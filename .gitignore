@@ -25,3 +25,8 @@ orchestrator/workspaces/
 # editable install metadata
 *.egg-info/
 __pycache__/
+
+# Tooling local (Claude Code / skills descargadas) — no es parte del entregable
+.claude/
+.agents/
+skills-lock.json
