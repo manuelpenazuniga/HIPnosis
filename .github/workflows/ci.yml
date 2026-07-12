@@ -58,11 +58,18 @@ jobs:
             | python3 -c "import json,sys; a=json.load(sys.stdin)['attestation']; d=a['predicate']['materials']['diff']['digest']; assert len(d)==64, 'digest invalido'; print('passport digest ok', d[:12])"
       - name: Gate — replay clock reveals events
         run: |
-          # El reloj revela eventos con el tiempo; tras unos segundos debe haber
-          # al menos uno visible (lenient: no fijamos el total exacto).
-          sleep 15
-          curl -fsS "http://localhost:8080/runs/run_bsw01a2/events?after=-1" \
-            | python3 -c "import json,sys; e=json.load(sys.stdin); assert isinstance(e,list) and len(e)>=1, 'sin eventos visibles'; print(f'{len(e)} eventos visibles')"
+          # El reloj arranca LAZY: t0 se fija en el PRIMER poll de eventos.
+          # Así que primero lo arrancamos, luego poleamos con reintentos hasta
+          # que revele al menos un evento (robusto ante el timing del runner).
+          curl -fsS "http://localhost:8080/runs/run_bsw01a2/events?after=-1" >/dev/null
+          for i in $(seq 1 15); do
+            n=$(curl -fsS "http://localhost:8080/runs/run_bsw01a2/events?after=-1" \
+                 | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")
+            echo "poll $i: $n eventos visibles"
+            [ "$n" -ge 1 ] && exit 0
+            sleep 2
+          done
+          echo "::error::el reloj de replay no revelo eventos"; exit 1
       - name: Logs on failure
         if: failure()
         run: docker compose --profile replay logs
