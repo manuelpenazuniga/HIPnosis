@@ -44,6 +44,9 @@ def run_full_pipeline(
         # build_loop lee ctx._oracle (y algunos caminos ctx.oracle): seteamos ambos.
         ctx.oracle = oracle
         ctx._oracle = oracle
+        # El manifiesto también se inyecta acá (no solo en verify): el patcher
+        # necesita saber qué archivos son oráculo (golden/output) para vetarlos.
+        ctx.manifest = manifest
         build_loop_handler(ctx)
 
     def _verify(ctx) -> None:

@@ -172,3 +172,26 @@ Integracion producto: ship escribe .github/workflows/hipnosis-guard.yml en el re
 Dogfood: .github/workflows/hipnosis-guard.yml del propio repo lintea examples/guard/ (kernel HIP
   limpio, pasa). docs/hipnosis-guard.md. README con seccion + roadmap actualizado. 393 tests.
 ====================================================================
+====================================================================
+🕵️ INTELIGENCIA COMPETITIVA + 6 ROBOS (vs Bridge y Kernel Olympics, Track Unicorn):
+Analizados ambos rivales (memoria competitive-intel-rivals.md). Bridge: clon real pero solo
+  porta fixtures de juguete, sin paridad numérica, nunca MI300X; su arma = "agentic security".
+  Kernel Olympics: pitch pulido pero "PASSED on MI300X" FABRICADO (texto hardcodeado, warpSize=32
+  en wave64), contenedor sin hipcc. Robos implementados priorizados por costo/beneficio:
+  #1 SEGURIDAD AGÉNTICA (roba el diferenciador de Bridge): patcher veta paths protegidos
+    (PROTECTED_ALWAYS: hipnosis.yaml/.hipnosis/.github/ + golden/output del manifiesto),
+    PatchStatus.PROTECTED all-or-nothing; camino determinista salta protegidos + traversal/symlink;
+    THREAT_MODEL.md honesto (T1-T7, PLANNED marcados) + seccion README. core.patcher.is_protected.
+  #2 GATE DE INTEGRIDAD DEL ORACULO en VERIFY (adapta anti-trampa de Bridge): check_oracle_integrity
+    pregunta a git si hipnosis.yaml/golden cambiaron desde el commit fuente o estan dirty → FAIL
+    SIN ejecutar el binario (un PASS contra oraculo adulterado no es PASS). Defensa en profundidad
+    sobre #1 (el veredicto no confia en el patcher).
+  #1+#2: tests/test_redteam.py (22 tests: inyeccion como dato, paths protegidos, traversal/symlink,
+    gate de integridad, verify fail-closed). 393→415 tests, suite verde, guard dogfood limpio.
+  #3 tabla de resultados honesta en README (bsw 8→0/4it, softmax 3→0/3it, scan 10→0/6it; numeros
+    REALES del pipeline mock + fixture hero; DONE_PARTIAL/NEEDS_HUMAN como salida de primera clase).
+  #4 tiles de costo ($0.00 cloud, 100% local, 438 tokens) en README, sourced de counters.
+  #5 scripts/record_demo_cast.sh: asciinema del run REAL (terminal POST→PASS, cero hardcode — donde
+    KO se quemo); integrado al runbook M0 §6. #6 tabla de negocio (manual/hipify/AI-demos/HIPnosis).
+  DEVIATIONS D-7 (seguridad) y D-8 (cast). Pendiente humano: M0 (grabar cast/fixtures reales).
+====================================================================

@@ -23,7 +23,7 @@ from core.gitrepo import GitRepo
 from core.llm.prompts import render_fixer
 from core.llm.router import client_for_tier, decide_tier as _decide_tier
 from core.oracle.base import Oracle
-from core.patcher import PatchStatus, apply_patch
+from core.patcher import PatchStatus, apply_patch, is_protected
 from core.phases.loop import (
     ApplyFn,
     ApplyOutcome,
@@ -60,24 +60,39 @@ def _apply_deterministic_fix(
     fix_template: str,
     group: ErrorGroup,
     workspace_root: str,
+    protected_extra: tuple[str, ...] = (),
 ) -> int:
     """Apply a deterministic fix globally on all affected files.
 
     Parses the sed-like ``fix_template`` (from ``deterministic_fix``),
     collects unique source files from the error group, applies a global
     ``re.sub`` on each, and returns how many files were modified.
+
+    Los nombres de archivo del grupo vienen del OUTPUT DEL COMPILADOR — input
+    no confiable (un Makefile hostil puede imprimir líneas de error falsas que
+    apunten al manifiesto o al golden). Los paths protegidos se saltan acá
+    igual que en ``core.patcher`` (§0.2).
     """
     pattern_str, replacement_str = _parse_deterministic_template(fix_template)
     pattern = re.compile(pattern_str)
 
     files: set[str] = set()
     for e in group.errors:
-        if e.file and e.file != "<link>":
+        if e.file and e.file != "<link>" and not is_protected(e.file, protected_extra):
             files.add(e.file)
 
     touched = 0
+    ws_resolved = Path(workspace_root).resolve()
     for fname in sorted(files):
         fpath = Path(workspace_root) / fname
+        # Containment: un error envenenado con "../" no puede sacar la
+        # escritura del workspace (mismo contrato que core.patcher).
+        if fpath.is_symlink():
+            continue
+        try:
+            fpath.resolve().relative_to(ws_resolved)
+        except ValueError:
+            continue
         if not fpath.is_file():
             continue
         content = fpath.read_text(encoding="utf-8")
@@ -113,6 +128,18 @@ def make_loop_functions(
     _group: ErrorGroup | None = None
     _klass: str = "E99"
     tokens: dict[str, int] = {"local": 0, "remote": 0}
+
+    # Paths protegidos EXTRA además de PROTECTED_ALWAYS: los archivos que el
+    # manifiesto declara como oráculo (golden/output). Leído defensivamente —
+    # si el caller no inyectó ctx.manifest, la protección base sigue vigente.
+    manifest = getattr(ctx, "manifest", None)
+    protected_extra: tuple[str, ...] = ()
+    if manifest is not None:
+        extras = [
+            getattr(manifest.verify, "golden_file", None),
+            getattr(manifest.verify, "output_file", None),
+        ]
+        protected_extra = tuple(p for p in extras if p)
 
     def classify_fn(g: ErrorGroup) -> str:
         nonlocal _group, _klass
@@ -210,7 +237,7 @@ def make_loop_functions(
         if _strategy == "deterministic":
             if not patch or not _group:
                 return ApplyOutcome(applied_ws=False)
-            touched = _apply_deterministic_fix(patch, _group, ctx.repo_dir)
+            touched = _apply_deterministic_fix(patch, _group, ctx.repo_dir, protected_extra)
             if touched == 0:
                 # El template no matcheó nada: el workspace no cambió.
                 return ApplyOutcome(applied_ws=False)
@@ -229,7 +256,7 @@ def make_loop_functions(
         except Exception:
             return ApplyOutcome(applied_ws=False)
 
-        result = apply_patch(patch, repo, msg, ctx.trace)
+        result = apply_patch(patch, repo, msg, ctx.trace, protected_paths=protected_extra)
         if result.status != PatchStatus.APPLIED:
             return ApplyOutcome(applied_ws=False)
 

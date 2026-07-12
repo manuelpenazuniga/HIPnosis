@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass
 from typing import Optional
@@ -170,6 +171,69 @@ def _resolve_actual_text(
 
 
 # ---------------------------------------------------------------------------
+# Gate de integridad del oráculo (defensa en profundidad sobre core.patcher)
+# ---------------------------------------------------------------------------
+
+def _git_out(repo_dir: str, *args: str) -> str:
+    """``git -C repo_dir <args>`` → stdout. Lanza en exit != 0."""
+    proc = subprocess.run(
+        ["git", "-C", repo_dir, *args],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    return proc.stdout
+
+
+def check_oracle_integrity(repo_dir: str, manifest: Manifest) -> tuple[bool, str]:
+    """¿Los archivos del oráculo llegaron INTACTOS a VERIFY?
+
+    Los inputs que deciden el veredicto (``hipnosis.yaml`` y el
+    ``golden_file`` si existe) no pueden haber sido modificados por el
+    pipeline entre el commit fuente (raíz del clone) y HEAD, ni estar
+    sucios en el working tree. El patcher ya los veta (PROTECTED), pero
+    el veredicto no confía en el patcher: le pregunta a git.
+
+    Devuelve ``(ok, detail)``. Sin ``.git`` (p.ej. fixtures de tests que
+    no son repos) el gate no aplica: ``(True, "no git workspace")`` —
+    la protección del patcher sigue vigente en ese caso.
+    """
+    if not os.path.isdir(os.path.join(repo_dir, ".git")):
+        return True, "no git workspace"
+
+    paths = ["hipnosis.yaml"]
+    if manifest.verify.golden_file:
+        paths.append(manifest.verify.golden_file)
+
+    try:
+        roots = _git_out(repo_dir, "rev-list", "--max-parents=0", "HEAD").strip().splitlines()
+        source_commit = roots[0] if roots else ""
+        if not source_commit:
+            return True, "no source commit (unborn HEAD)"
+        changed = _git_out(
+            repo_dir, "diff", "--name-only", f"{source_commit}..HEAD", "--", *paths
+        ).strip()
+        dirty = _git_out(repo_dir, "status", "--porcelain", "--", *paths).strip()
+    except (subprocess.SubprocessError, OSError) as exc:
+        # Fail-closed sería castigar runs legítimos por un git roto; el gate
+        # es defensa en profundidad, así que degrada honesto y queda en el trace.
+        return True, f"integrity check unavailable ({exc})"
+
+    if changed or dirty:
+        # porcelain v1: "XY PATH" — XY = 2 chars de estado, luego un espacio.
+        # Split con maxsplit=1 evita cortar nombres con espacios o prefijos raros.
+        dirty_paths = {
+            line.split(maxsplit=1)[1]
+            for line in dirty.splitlines()
+            if len(line.split(maxsplit=1)) == 2
+        }
+        touched = sorted(set(changed.splitlines()) | dirty_paths)
+        return False, f"oracle files modified during run: {', '.join(touched)}"
+    return True, "oracle files untouched since source commit"
+
+
+# ---------------------------------------------------------------------------
 # API pública
 # ---------------------------------------------------------------------------
 
@@ -221,6 +285,37 @@ def verify(
             stale = os.path.join(repo_dir, output_file)
             if os.path.isfile(stale):
                 os.remove(stale)
+
+    # 0. Gate de integridad del oráculo (anti-trampa, defensa en profundidad):
+    # si los inputs que deciden el veredicto fueron tocados durante el run,
+    # NO se ejecuta nada — un PASS contra un oráculo adulterado no es un PASS.
+    if mode in ("self_check", "golden_output"):
+        integrity_ok, integrity_detail = check_oracle_integrity(repo_dir, manifest)
+        if not integrity_ok:
+            parity = ParityResult(ok=False, detail=integrity_detail)
+            verify_result = VerifyResult(
+                ran=False,
+                exit_code=-1,
+                verdict=VERDICT_FAIL,
+                parity_details=integrity_detail,
+                timing=None,
+            )
+            if trace is not None:
+                trace.emit(
+                    "verify",
+                    verdict=VERDICT_FAIL,
+                    detail=integrity_detail,
+                    mode=mode,
+                    ran=False,
+                    exit_code=-1,
+                    oracle_integrity=False,
+                )
+            return VerifyOutcome(
+                verify_result=verify_result,
+                parity=parity,
+                wall_clock_s=0.0,
+                mode=mode,
+            )
 
     # 1. Correr el benchmark.
     t0 = time.monotonic()
@@ -386,6 +481,7 @@ __all__ = [
     "VERDICT_NO_ORACLE",
     "VERDICT_PASS",
     "VerifyOutcome",
+    "check_oracle_integrity",
     "verify",
     "verify_handler",
 ]

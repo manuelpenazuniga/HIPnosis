@@ -40,6 +40,45 @@ class PatchStatus(str, Enum):
     AMBIGUOUS = "ambiguous"
     INVALID = "invalid"
     VERIFY_FAILED = "verify_failed"
+    PROTECTED = "protected"
+
+
+# Paths que NINGÚN parche puede tocar, jamás (§0.2: los oráculos no se negocian).
+# El contenido del repo objetivo y la salida del compilador son INPUT NO CONFIABLE
+# que termina dentro de prompts LLM; si una inyección convence al modelo de "arreglar"
+# el manifiesto o el workflow de CI, el rechazo tiene que ser mecánico, acá.
+# Entradas que terminan en "/" protegen el directorio completo (prefijo).
+PROTECTED_ALWAYS: tuple[str, ...] = (
+    "hipnosis.yaml",
+    ".hipnosis/",
+    ".github/",
+)
+
+
+def is_protected(rel_path: str, extra: tuple[str, ...] = ()) -> bool:
+    """True si *rel_path* (relativo al workspace, separador ``/``) es intocable.
+
+    Compara contra :data:`PROTECTED_ALWAYS` + ``extra`` (p.ej. el golden file
+    que declara el manifiesto). Match exacto para archivos; prefijo para
+    entradas que terminan en ``/``.
+    """
+    def _norm(p: str) -> str:
+        p = p.replace(os.sep, "/")
+        while p.startswith("./"):
+            p = p[2:]
+        return p
+
+    norm = _norm(rel_path)
+    for entry in PROTECTED_ALWAYS + tuple(extra):
+        if not entry:
+            continue
+        e = _norm(entry)
+        if e.endswith("/"):
+            if norm.startswith(e) or norm == e.rstrip("/"):
+                return True
+        elif norm == e:
+            return True
+    return False
 
 
 @dataclass
@@ -149,6 +188,7 @@ def apply_patch(
     repo,
     commit_message: str,
     trace=None,
+    protected_paths: tuple[str, ...] = (),
 ) -> PatchResult:
     workspace_root = str(repo._repo.working_dir)
 
@@ -173,6 +213,14 @@ def apply_patch(
         if cp is None:
             return PatchResult(
                 PatchStatus.INVALID, f"path inseguro, symlink o fuera del workspace: '{blk.file}'"
+            )
+        rel = os.path.relpath(cp, str(Path(workspace_root).resolve()))
+        if is_protected(rel, protected_paths):
+            if trace is not None:
+                trace.emit("patch_rejected", reason="protected_path", file=rel)
+            return PatchResult(
+                PatchStatus.PROTECTED,
+                f"path protegido (oráculo/CI intocable): '{blk.file}'",
             )
         canonical[blk.file] = cp
         cpath_set.add(cp)

@@ -1,5 +1,5 @@
 # CI — protege el entregable. Corre en cada push/PR:
-#   1. tests: la suite completa (393) del orquestador.
+#   1. tests: la suite completa (415) del orquestador.
 #   2. replay-smoke: build del contenedor replay (el artefacto ejecutable) +
 #      healthz + smoke del dashboard — el gate que el audit pidió y que habría
 #      cazado la página en blanco / los deep-links rotos.
