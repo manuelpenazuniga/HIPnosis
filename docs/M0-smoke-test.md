@@ -69,15 +69,24 @@ docker --version                         # Docker viene en la imagen ROCm
 docker compose version                   # si falla: apt-get update && apt-get install -y docker-compose-plugin
 ```
 
-### 0.5 — HuggingFace + licencia de Gemma  ✅ (ya lo tenés)
+### 0.5 — HuggingFace + licencia de Gemma  ⚠️ ACEPTÁ LA DEL 12B
 
-**Por qué (F-01c):** Gemma 3 27B es un modelo *gated*. Sin aceptar la licencia con tu cuenta,
-la descarga de pesos da **401** y vLLM no levanta.
+**Por qué (F-01c):** cada modelo Gemma en HuggingFace es *gated por separado*. Sin aceptar la
+licencia del modelo EXACTO que vas a usar, la descarga de pesos da **401** y vLLM no levanta.
 
-- Confirmá que en [google/gemma-3-27b-it](https://huggingface.co/google/gemma-3-27b-it) la página
-  diga **"You have been granted access"** (no el formulario). Ojo: tiene que ser esa variante
-  exacta (27b-it), no otra Gemma.
-- El token va a ser tu `HF_TOKEN` (uno de **Read**, de https://huggingface.co/settings/tokens).
+> ⚠️ **La ruta eficiente usa Gemma 3 12B, no 27B (§4).** Aceptar la licencia del 27B **NO** te
+> habilita el 12B — son gates distintos. Andá a **https://huggingface.co/google/gemma-3-12b-it**
+> con **la misma cuenta** y aceptá esa licencia también. El **mismo `HF_TOKEN`** sirve para ambos
+> una vez aceptadas.
+
+- [ ] **12B (el que vas a usar):** en [google/gemma-3-12b-it](https://huggingface.co/google/gemma-3-12b-it)
+      la página dice **"You have been granted access"** (no el formulario).
+- [x] 27B (fallback / si preferís el modelo grande): ya la aceptaste en
+      [google/gemma-3-27b-it](https://huggingface.co/google/gemma-3-27b-it).
+- Tu `HF_TOKEN` es uno de **Read** (de https://huggingface.co/settings/tokens) — el mismo para las dos.
+
+> 💡 Si preferís **no** aceptar otra licencia: quedate en 27B (solo baja más lento/caro) o usá el
+> **fallback Fireworks** (cero licencia de HuggingFace) — ambos descritos en §4.
 
 ### 0.6 — Fireworks  ✅ (ya lo tenés)
 
@@ -96,7 +105,7 @@ Solo hace falta si querés que el pipeline abra el **PR** automáticamente. Sin 
 ### 0.8 — Checklist final antes de seguir
 
 - [ ] SSH al droplet funciona (`ssh root@<ip>`), `rocminfo` muestra **gfx942**, `docker compose` responde.
-- [ ] `HF_TOKEN` a mano y la licencia de Gemma **aceptada** (0.5).
+- [ ] `HF_TOKEN` a mano y la licencia de **Gemma 3 12B** aceptada (0.5) — ⚠️ la del 12B, no solo la del 27B.
 - [ ] `FIREWORKS_API_KEY` + `REMOTE_LLM_MODEL` a mano (0.6).
 - [ ] (Opcional) `GITHUB_TOKEN`.
 - [ ] Anotá recordar: **snapshot + destruir el droplet** al terminar M0 (regla de costo).
@@ -166,15 +175,21 @@ ls ../HeCBench/src/bsw-cuda ../HeCBench/src/softmax-cuda
 ```bash
 cp orchestrator/.env.example orchestrator/.env
 # Editá orchestrator/.env y completá AL MENOS:
-#   HF_TOKEN=hf_xxxxxxxx           # tu token de HuggingFace (Gemma es gated — F-01c)
+#   HF_TOKEN=hf_xxxxxxxx                       # tu token de HuggingFace (Gemma es gated — F-01c)
 #   ORACLE_MODE=real
 #   GPU_ARCH=gfx942
+#   LOCAL_LLM_MODEL=google/gemma-3-12b-it      # ⚠️ RUTA EFICIENTE: 12B (debe coincidir con el
+#                                              #   --model del vllm en docker-compose.yml, §4)
 # Opcionales:
-#   FIREWORKS_API_KEY=fw_xxxx      # fixer remoto (si no, el pipeline usa solo el local)
-#   REMOTE_LLM_MODEL=<id exacto>   # verificar en fireworks.ai el id del modelo de código
-#   GITHUB_TOKEN=ghp_xxxx          # para generar PR (opcional; sin él, branch + format-patch)
+#   FIREWORKS_API_KEY=fw_xxxx                  # fixer remoto (fallback F-01 / fixes duros)
+#   REMOTE_LLM_MODEL=accounts/fireworks/models/deepseek-v4-pro   # ya validado con curl
+#   GITHUB_TOKEN=ghp_xxxx                      # para generar PR (opcional; sin él, branch + format-patch)
 ```
 ⚠️ **NUNCA** commitees `orchestrator/.env` (está en `.gitignore`). El `.env.example` sí se versiona.
+
+> 🔗 **Coincidencia obligatoria (§4):** `LOCAL_LLM_MODEL` acá **debe ser idéntico** al `--model`
+> del servicio `vllm` en `docker-compose.yml`. Si usás 12B, ambos `google/gemma-3-12b-it`. Si no
+> coinciden, el orquestador pide un modelo que vLLM no sirve → 404.
 
 ---
 
@@ -185,8 +200,9 @@ cp orchestrator/.env.example orchestrator/.env
 >
 > 1. **Usá Gemma 3 12B, no 27B.** Baja **~24 GB en vez de ~54 GB** (≈15–20 min menos), usa
 >    menos VRAM (menos riesgo de F-01), y mantiene la historia "Gemma local, $0 API" (sigue
->    siendo Gemma → sigue contando para el premio Gemma). En `docker-compose.yml`, servicio
->    `vllm`: `--model google/gemma-3-12b-it`; y `LOCAL_LLM_MODEL=google/gemma-3-12b-it` en `.env`.
+>    siendo Gemma → sigue contando para el premio Gemma). El `LOCAL_LLM_MODEL` del `.env` ya
+>    quedó en 12B (§3); **falta el par:** en `docker-compose.yml`, servicio `vllm`, cambiá
+>    `--model` a `google/gemma-3-12b-it` (los dos DEBEN coincidir, si no → 404).
 > 2. **Solapá la descarga con el smoke de hardware.** Arrancá el stack en background (`up -d`)
 >    y mientras baja los pesos corré el paso 2 (rocminfo, hipcc saxpy, hipify-perl) — el reloj
 >    de la GPU corre igual, así que no lo desperdicies mirando una barra de progreso.
@@ -344,10 +360,10 @@ Si algún paso falló y no se pudo resolver en su ventana de tiempo, anotá cuá
 
 ## Resumen ultra-corto — ruta eficiente (droplet vivo mínimo)
 ```bash
-# 0. TODO listo antes de crear el droplet (§0): SSH key, HF_TOKEN, Fireworks, licencia Gemma.
+# 0. TODO listo antes de crear el droplet (§0): SSH key, HF_TOKEN, Fireworks, licencia Gemma 12B (⚠️ la del 12B).
 # 1. crear droplet 1x MI300X (imagen ROCm) → ssh root@<ip> → git clone .../HIPnosis && cd HIPnosis
-cp orchestrator/.env.example orchestrator/.env && vim orchestrator/.env   # HF_TOKEN + Fireworks
-# usar Gemma 12B (mitad de descarga): editar docker-compose.yml vllm --model google/gemma-3-12b-it
+cp orchestrator/.env.example orchestrator/.env && vim orchestrator/.env   # HF_TOKEN + Fireworks + LOCAL_LLM_MODEL=google/gemma-3-12b-it
+# 12B (mitad de descarga): editar docker-compose.yml vllm --model google/gemma-3-12b-it  (DEBE coincidir con el .env)
 docker compose --profile gpu up -d --build               # 2. arrancar EN BACKGROUND (deja bajando)
 # 3. MIENTRAS baja, en paralelo: smoke de hardware
 rocminfo | grep gfx942 && hipcc --offload-arch=gfx942 saxpy.cpp -o s && ./s && which hipify-perl
