@@ -30,3 +30,9 @@ __pycache__/
 .claude/
 .agents/
 skills-lock.json
+
+# Bitácoras internas del equipo (routing de workers, intel competitiva, checkpoints)
+# — proceso, no producto; opsec vs rivales
+DEVIATIONS.md
+ESTADO.md
+BITACORA.md
