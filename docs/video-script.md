@@ -4,14 +4,111 @@
 > hacés/mostrás en pantalla) y **🎙️ DECIR** (en inglés — la narración, leela tal cual).
 > Los comandos y URLs son literales. Duración objetivo: **6:00**.
 >
-> **Setup de grabación:** pantalla limpia, terminal con fuente grande (≥16pt), navegador
-> en ventana ancha. Tené listo: el repo clonado, Docker corriendo, y el sitio replay
-> abierto en una pestaña. Grabá a 1080p. Recomendado: OBS o QuickTime.
+> **Setup de grabación:** seguí la sección [🛠 Setup de grabación](#-setup-de-grabación--paso-a-paso-hacer-antes-de-grabar)
+> de abajo ANTES de tocar el botón de grabar. Son ~30 min de preparación y evitan
+> tener que regrabar todo.
 >
 > **Nota de honestidad:** el video usa el modo **replay** (una corrida grabada), que es
 > como los jueces lo reproducen sin GPU. El smoke test **M0 en una MI300X real ya pasó**
 > (toolchain ROCm + pipeline GPU verificados end-to-end). Si se regraba una corrida real
 > en el droplet, `scripts/record_fixture.sh` la congela y el badge pasa a "recorded run".
+
+---
+
+## 🛠 Setup de grabación — paso a paso (hacer ANTES de grabar)
+
+> Tiempo total de preparación: **~30 minutos**. El objetivo es que cuando aprietes
+> "grabar", TODO ya esté listo y solo tengas que seguir el guion.
+
+### Paso 1 — Instalar lo necesario (5 min)
+
+1. **Docker Desktop abierto y corriendo.** Mirá la barra de menú de macOS: el ícono
+   de la ballena tiene que estar quieto (no animado). Si no está, abrí Docker Desktop
+   y esperá a que diga "running".
+2. **Grabador de pantalla.** Camino fácil (recomendado): **QuickTime Player**, ya viene
+   en macOS, no hay que instalar nada. Alternativa si querés más control (escenas,
+   marca de agua): OBS (`brew install --cask obs`), pero para un video de 6 minutos
+   QuickTime alcanza y sobra.
+3. **Micrófono.** El de unos auriculares (AirPods sirven) suena mejor que el interno
+   del Mac porque está cerca de tu boca. Conectalos ANTES de configurar QuickTime.
+
+### Paso 2 — Silenciar el mundo (2 min)
+
+1. **Activar "No molestar"**: Centro de control (arriba a la derecha) → Concentración
+   → **No molestar**. Esto evita que un mensaje de WhatsApp aparezca en medio del video.
+2. Cerrá TODAS las apps que no sean: Terminal, el navegador y el grabador.
+3. Si tenés el escritorio lleno de íconos y va a verse en cámara, usá un escritorio
+   nuevo limpio (Mission Control → botón `+`).
+
+### Paso 3 — Preparar la terminal (3 min)
+
+1. Abrí Terminal (o iTerm) y agrandá la fuente hasta **16pt o más**: `Cmd +` varias
+   veces. Regla práctica: parate a 2 metros de la pantalla; si no leés los comandos,
+   es chica.
+2. Tema oscuro, ventana ocupando media pantalla o más.
+3. Andá al repo: `cd /Volumes/MacMiniExt/dev/ZedProjects/HIPnosis`
+4. Limpiá la pantalla con `clear` justo antes de grabar, para arrancar sin historia.
+
+### Paso 4 — Precalentar Docker (10 min, se hace UNA vez)
+
+El primer `docker compose up` construye la imagen y tarda minutos. En cámara tiene
+que ser rápido, así que construí ANTES:
+
+```bash
+docker compose --profile replay build   # tarda; tomate un café
+docker compose --profile replay up      # verificá que levanta y abre bien
+# abrí http://localhost:8080 y mirá que el dashboard cargue
+docker compose --profile replay down    # bajalo: en cámara lo levantás "en vivo"
+```
+
+Con la imagen ya construida, el `up` en cámara tarda segundos, no minutos.
+
+### Paso 5 — Preparar el navegador (3 min)
+
+1. **Chrome en ventana ancha**: mínimo 1400px (maximizada está bien). Zoom al 100%
+   (`Cmd 0`).
+2. Ocultá la barra de marcadores: `Cmd Shift B`.
+3. Cerrá todas las pestañas menos las que usa el guion: la **landing** y (cuando
+   levantes el stack) `http://localhost:8080`.
+4. **Resetear el onboarding** para que el overlay "Three things to watch" aparezca
+   en cámara: en `localhost:8080` abrí la consola del navegador (`Cmd Option J`),
+   escribí `localStorage.clear()` y Enter. Después cerrá la consola y cerrá la pestaña
+   (la vas a reabrir durante la grabación).
+
+### Paso 6 — Configurar QuickTime y probar el audio (5 min)
+
+1. QuickTime Player → **Archivo → Nueva grabación de pantalla**.
+2. En **Opciones**: elegí tu **micrófono** (los auriculares, no "ninguno") y activá
+   **"Mostrar los clics del ratón"** — ayuda muchísimo a que el juez siga el cursor.
+3. Elegí **grabar la pantalla completa**.
+4. **Prueba de audio obligatoria**: grabá 10 segundos hablando normal, paralo,
+   reproducilo. ¿Se escucha claro y fuerte, sin eco? Listo. ¿Suena lejano? El mic
+   seleccionado es el equivocado, volvé al punto 2.
+
+### Paso 7 — Ensayo general (5 min, sin grabar)
+
+Recorré el guion completo UNA vez sin grabar: levantá el stack, abrí el dashboard,
+hacé los scrolls de cada sección, tocá el botón del tamper demo. Así en cámara ya
+sabés dónde está cada cosa y no la buscás en vivo. Al terminar: `docker compose
+--profile replay down`, `clear` en la terminal, `localStorage.clear()` de nuevo.
+
+### Paso 8 — Grabar
+
+- Grabá **todo en una sola toma larga**; los errores se cortan después en edición.
+- Si te trabás o te equivocás: **pausa de 3 segundos en silencio** y repetí la frase
+  completa. Ese silencio te marca dónde cortar al editar.
+- Hablá más despacio de lo que te parece natural. Leé los bloques **🎙️ DECIR** tal cual.
+- Mové el mouse lento y "señalá" con el cursor lo que estás nombrando.
+
+### Paso 9 — Editar y exportar
+
+1. Editor simple: **iMovie** (gratis) o CapCut. Cortá: los errores marcados con
+   silencio, y los tiempos muertos del `docker compose up` (o acelerálos 4×).
+2. Exportá **1080p, MP4**. Duración objetivo: 6:00 (máximo tolerable ~6:30).
+3. Subilo a YouTube como **unlisted**, título sugerido:
+   `HIPnosis — Verified CUDA to ROCm Ports (AMD Developer Hackathon ACT II)`.
+4. Pegá el link en el campo de video de la submission de lablab y **mirá el video
+   entero una vez desde el link** (no desde tu archivo local) antes de entregar.
 
 ---
 
