@@ -15,31 +15,50 @@
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
     .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 
+    /* Curvas de firma (Emil std 3): las built-in son débiles. --ease-out es un
+       ease-out fuerte (el usuario mira el arranque); --ease-spring tiene un
+       overshoot mínimo para las entradas del hero (physicality sin rebote burdo). */
+    :root {
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+    }
+
     @keyframes pulse-glow {
       0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
       50% { box-shadow: 0 0 20px 4px rgba(59, 130, 246, 0.2); }
     }
     @keyframes pulse-dot {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.8); }
+      50% { opacity: 0.5; transform: scale(0.85); }
     }
     @keyframes slide-up {
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
+    /* Emil std 5: nada aparece de la nada. scale(0.96), no 0.8 — un asentamiento
+       sutil, no un "pop". */
     @keyframes count-up {
-      from { opacity: 0; transform: scale(0.8); }
-      to { opacity: 1; transform: scale(1); }
+      from { opacity: 0; transform: scale(0.96) translateY(4px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
     }
     @keyframes bar-grow {
       from { transform: scaleX(0); }
       to { transform: scaleX(1); }
     }
-    .animate-slide-up { animation: slide-up 0.4s ease-out forwards; }
-    .animate-count { animation: count-up 0.5s ease-out forwards; }
+    /* Entrada orquestada del hero (Emil: stagger 30-80ms). Cada elemento fija
+       --i; el delay cascada crea el "thousand voices in tune". */
+    @keyframes hero-in {
+      from { opacity: 0; transform: translateY(14px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .hero-enter { opacity: 0; animation: hero-in 0.55s var(--ease-spring) both;
+                  animation-delay: calc(var(--i, 0) * 70ms); }
+
+    .animate-slide-up { animation: slide-up 0.4s var(--ease-out) forwards; }
+    .animate-count { animation: count-up 0.5s var(--ease-spring) forwards; }
     .pulse-active { animation: pulse-glow 2s ease-in-out infinite; }
     .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
-    .bar-animate { animation: bar-grow 0.6s ease-out forwards; transform-origin: left; }
+    .bar-animate { animation: bar-grow 0.6s var(--ease-out) forwards; transform-origin: left; }
 
     .diff-container pre { margin: 0; padding: 0; background: transparent !important; }
     .diff-line { padding: 1px 12px; white-space: pre; font-size: 13px; line-height: 1.6; }
@@ -52,7 +71,13 @@
     @keyframes draw-line { to { stroke-dashoffset: 0; } }
 
     .glass { background: rgba(17, 17, 24, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
-    .glass-hover:hover { border-color: rgba(237, 28, 36, 0.3); }
+    /* Emil std 7: transiciones acotadas a props GPU (no `all`). std 8: hover
+       gateado a punteros finos — nada de hover-motion en touch. std 9: el press
+       responde más rápido que el reposo. */
+    .glass-hover { transition: transform 0.25s var(--ease-out), border-color 0.25s var(--ease-out), box-shadow 0.25s var(--ease-out); }
+    @media (hover: hover) and (pointer: fine) {
+      .glass-hover:hover { border-color: rgba(237, 28, 36, 0.35); transform: translateY(-2px); box-shadow: 0 8px 24px -12px rgba(237,28,36,0.25); }
+    }
 
     .cert-content h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: #f1f5f9; }
     .cert-content h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 0.5rem; color: #e2e8f0; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.25rem; }
@@ -78,7 +103,7 @@
     /* QW4: una sección aún no revelada NO reserva espacio — sin huecos vacíos
        durante el drip. Aparece (con animación) recién cuando su dato llega. */
     .section-reveal:not(.visible) { display: none; }
-    .section-reveal.visible { opacity: 1; animation: slide-up 0.5s ease-out forwards; }
+    .section-reveal.visible { opacity: 1; animation: slide-up 0.5s var(--ease-out) forwards; }
 
     /* Audit H13: respetar la preferencia de movimiento reducido del sistema. */
     @media (prefers-reduced-motion: reduce) {
@@ -128,18 +153,18 @@
       <header class="relative">
         <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-6">
           <div>
-            <div class="flex items-center gap-3 mb-1">
+            <div class="hero-enter flex items-center gap-3 mb-1" style="--i:0">
               <div class="w-8 h-1 bg-amd rounded-full"></div>
               <span class="text-xs font-semibold tracking-widest uppercase text-amd">AMD Developer Hackathon</span>
             </div>
-            <a href="../" class="inline-block hover:opacity-80 transition-opacity" title="Back to home">
+            <a href="../" class="hero-enter inline-block hover:opacity-80 transition-opacity" style="--i:1" title="Back to home">
             <h1 class="text-5xl sm:text-6xl font-black tracking-tight">
               <span class="text-white">HIP</span><span class="text-amd">nosis</span>
             </h1>
             </a>
-            <p class="text-gray-400 mt-2 text-lg">Autonomous CUDA → ROCm/AMD porting agent</p>
+            <p class="hero-enter text-gray-400 mt-2 text-lg" style="--i:2">Autonomous CUDA → ROCm/AMD porting agent</p>
           </div>
-          <div class="flex items-center gap-4">
+          <div class="hero-enter flex items-center gap-4" style="--i:3">
             <div class="text-right">
               <div class="flex items-center justify-end gap-2">
                 <span id="mode-badge" class="hidden"></span>
@@ -178,7 +203,7 @@
         <div id="scan-strip" class="hidden glass rounded-2xl px-5 py-3 mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-400"></div>
 
         <div id="hero-metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+          <div class="hero-enter glass rounded-2xl p-5 glass-hover" style="--i:4">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Errors Resolved</span>
               <svg id="sparkline-errors" class="w-16 h-8" viewBox="0 0 64 32"></svg>
@@ -189,7 +214,7 @@
             </div>
           </div>
 
-          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+          <div class="hero-enter glass rounded-2xl p-5 glass-hover" style="--i:5">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Resolved Locally</span>
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Gemma 3 · $0 API</span>
@@ -200,7 +225,7 @@
             </div>
           </div>
 
-          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300">
+          <div class="hero-enter glass rounded-2xl p-5 glass-hover" style="--i:6">
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Cloud API Cost</span>
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">Fireworks · hard cases</span>
@@ -211,7 +236,7 @@
             </div>
           </div>
 
-          <div class="glass rounded-2xl p-5 glass-hover transition-all duration-300 relative overflow-hidden">
+          <div class="hero-enter glass rounded-2xl p-5 glass-hover relative overflow-hidden" style="--i:7">
             <div class="absolute top-0 right-0 w-20 h-20 bg-amber-500/5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold uppercase tracking-wider text-gray-500">Wave64 Caught</span>
@@ -298,8 +323,8 @@
               <span>Remote (Cloud)</span>
             </div>
             <div class="h-3 bg-surface-600 rounded-full overflow-hidden flex">
-              <div id="tokens-local-bar" class="h-full bg-emerald-500 transition-all duration-700 rounded-l-full"></div>
-              <div id="tokens-remote-bar" class="h-full bg-blue-500 transition-all duration-700 rounded-r-full"></div>
+              <div id="tokens-local-bar" class="h-full bg-emerald-500 transition-[width] duration-700 rounded-l-full"></div>
+              <div id="tokens-remote-bar" class="h-full bg-blue-500 transition-[width] duration-700 rounded-r-full"></div>
             </div>
           </div>
           <div id="fixes-table" class="overflow-x-auto"></div>

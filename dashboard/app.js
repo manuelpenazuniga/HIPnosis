@@ -172,7 +172,7 @@ function renderTimeline() {
     const isTerminalPartial = phase === 'DONE_PARTIAL';
 
     const el = document.createElement('div');
-    let cls = 'px-3 py-2 rounded-xl text-xs font-semibold transition-all duration-300 flex items-center gap-1.5 ';
+    let cls = 'px-3 py-2 rounded-xl text-xs font-semibold transition-[background-color,color,box-shadow] duration-300 flex items-center gap-1.5 ';
     if (isActive) {
       if (isTerminalFail) cls += 'bg-red-500/20 text-red-400 border border-red-500/40 pulse-active';
       else if (isTerminalPartial) cls += 'bg-amber-500/20 text-amber-400 border border-amber-500/40 pulse-active';
@@ -189,6 +189,25 @@ function renderTimeline() {
   revealSection('timeline-section');
 }
 
+// Count-up interrumpible (Emil std 6): anima del valor MOSTRADO al nuevo, y
+// retargetea si llega otro valor a mitad (drip-feed). Respeta reduced-motion
+// (salta al valor). Solo dígitos GPU-free: cambia textContent, no layout.
+const _count = new WeakMap();
+function animateNumber(el, to, prefix = '') {
+  const prev = _count.get(el);
+  if (prev) cancelAnimationFrame(prev);
+  const from = (() => { const n = parseFloat(String(el.textContent).replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : 0; })();
+  const set = v => { el.textContent = prefix + Math.round(v); };
+  if (from === to || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { set(to); return; }
+  const t0 = performance.now(), dur = 650, easeOut = t => 1 - Math.pow(1 - t, 3);
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    set(from + (to - from) * easeOut(p));
+    if (p < 1) _count.set(el, requestAnimationFrame(step)); else { set(to); _count.delete(el); }
+  };
+  _count.set(el, requestAnimationFrame(step));
+}
+
 function renderHeroMetrics() {
   const r = state.report;
   const initialErrors = r ? r.errors_initial : (state.builds.length ? state.builds[0].errors : null);
@@ -196,7 +215,7 @@ function renderHeroMetrics() {
 
   if (initialErrors !== null && currentErrors !== null) {
     // "Errors Resolved" = resueltos (inicial - actuales), no el conteo inicial (audit H6).
-    $('metric-errors').textContent = initialErrors - currentErrors;
+    animateNumber($('metric-errors'), initialErrors - currentErrors);
     $('metric-errors-sub').textContent = `${initialErrors} → ${currentErrors}`;
     renderSparkline();
   }
@@ -205,7 +224,7 @@ function renderHeroMetrics() {
     const totalFixes = r.fixes_deterministic + r.fixes_local + r.fixes_remote;
     const localFixes = r.fixes_deterministic + r.fixes_local;
     const pct = totalFixes > 0 ? Math.round((localFixes / totalFixes) * 100) : 0;
-    $('metric-local').textContent = pct;
+    animateNumber($('metric-local'), pct);
 
     // H7/F-17: el costo viene CALCULADO del backend (evento report). El front
     // no conoce precios; sin el campo, solo el caso trivial 0 tokens = $0.
@@ -213,9 +232,9 @@ function renderHeroMetrics() {
                : (r.tokens_remote === 0 ? 0 : null);
     $('metric-cost').textContent = cost === null ? '—' : `$${cost.toFixed(2)}`;
 
-    $('metric-wave64').textContent = r.wave64_findings || state.wave64.length;
+    animateNumber($('metric-wave64'), r.wave64_findings || state.wave64.length);
   } else {
-    $('metric-wave64').textContent = state.wave64.length;
+    animateNumber($('metric-wave64'), state.wave64.length);
   }
 }
 
@@ -309,7 +328,7 @@ function renderBurndown() {
     html += `<div class="flex items-center gap-4 group">
       <div class="w-16 text-xs font-mono text-gray-500 text-right flex-shrink-0">iter ${b.iteration}</div>
       <div class="flex-1 h-8 bg-surface-600 rounded-lg relative overflow-hidden">
-        <div class="${barColor} h-full rounded-lg bar-animate transition-all duration-500" style="width:${Math.max(pct, 2)}%; animation-delay:${delay}ms"></div>
+        <div class="${barColor} h-full rounded-lg bar-animate transition-[width] duration-500" style="width:${Math.max(pct, 2)}%; animation-delay:${delay}ms"></div>
         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold ${isZero ? 'text-emerald-400' : 'text-white'}">${b.errors}</span>
       </div>
       <div class="w-12 text-xs font-mono text-gray-600 flex-shrink-0">${b.delta > 0 ? '+' : ''}${b.delta}</div>
