@@ -318,12 +318,12 @@ def test_render_certificate_contains_all_required_sections() -> None:
     assert "Port exitoso en mock." in md
 
     # §8.2 Inventario.
-    assert "Archivos CUDA" in md
+    assert "CUDA files" in md
     assert "420" in md          # loc_kernels del scan, NO inventado
     assert "medium" in md       # difficulty
 
     # §8.3 Tabla de fixes.
-    assert "Fixes aplicados" in md
+    assert "Applied fixes" in md
     assert "deterministic" in md
     assert "local" in md
     assert "remote" in md
@@ -337,20 +337,20 @@ def test_render_certificate_contains_all_required_sections() -> None:
     # §8.5 Verificación.
     assert "PASS" in md
     assert "self-check PASS" in md
-    assert "rtol/atol" in md or "tolerancias" in md.lower()
+    assert "rtol/atol" in md or "tolerances" in md.lower()
 
     # §8.6 Timing.
     assert "build_s" in md or "Timing" in md
 
     # §8.7 NEEDS_HUMAN — sección obligatoria aunque esté vacía.
     assert "NEEDS_HUMAN" in md
-    assert "Limitaciones" in md
+    assert "Limitations" in md
     assert "deadbeef00" in md  # signature listada explícitamente
 
     # §8.8 Métricas de eficiencia.
-    assert "Métricas" in md or "eficiencia" in md.lower()
-    assert "Iteraciones" in md
-    assert "Tokens" in md
+    assert "metrics" in md.lower() or "efficiency" in md.lower()
+    assert "iterations" in md.lower()
+    assert "tokens" in md.lower()
 
 
 def test_render_certificate_keeps_needs_human_section_when_empty() -> None:
@@ -370,9 +370,9 @@ def test_render_certificate_keeps_needs_human_section_when_empty() -> None:
     md = render_certificate(data)
 
     assert "NEEDS_HUMAN" in md
-    assert "Limitaciones" in md
+    assert "Limitations" in md
     # Y debe indicar explícitamente que NO hay grupos sin resolver.
-    assert "No hay grupos sin resolver" in md or "no hay grupos" in md.lower()
+    assert "No unresolved groups" in md or "unresolved" in md.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -544,7 +544,7 @@ def test_render_pr_body_contains_verdict_and_metrics() -> None:
     assert "Verdict" in md or "verdict" in md
     assert "PASS" in md
     assert "Wave64" in md or "wave64" in md
-    assert "Métricas" in md or "M" in md
+    assert "Metrics" in md or "M" in md
 
 
 # ---------------------------------------------------------------------------

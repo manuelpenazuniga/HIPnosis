@@ -246,12 +246,12 @@ def test_ship_generates_certificate_with_verdict_and_sections(
     content = cert_path.read_text(encoding="utf-8")
     assert "PASS" in content                          # verdict
     assert "Verdict" in content or "Veredicto" in content
-    assert "Inventario" in content                    # §2
-    assert "Fixes aplicados" in content               # §3
+    assert "Inventory" in content                    # §2
+    assert "Applied fixes" in content               # §3
     assert "wave64" in content.lower()                # §4
     assert "W01" in content                           # hallazgo concreto
     assert "NEEDS_HUMAN" in content                   # §7 (siempre)
-    assert "Métricas" in content or "eficiencia" in content.lower()  # §8
+    assert "metrics" in content.lower() or "efficiency" in content.lower()  # §8
 
     # 4. El SHA del branch y la rama están reflejados en el certificado.
     assert "hipnosis/rocm-port" in content or data.repo_url in content

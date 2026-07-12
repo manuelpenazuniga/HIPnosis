@@ -6,68 +6,68 @@
 
 ---
 
-## 1. Resumen ejecutivo
+## 1. Executive summary
 
 {% if data.executive_summary %}{{ data.executive_summary }}
-{% else %}_(Sin resumen ejecutivo — generado únicamente con datos del pipeline; F-17/INV-7)._
+{% else %}_(No executive summary — generated from pipeline data only; F-17/INV-7)._
 {% endif %}
 
 ---
 
-## 2. Inventario
+## 2. Inventory
 
 | Metric | Value |
 |---|---|
-| Archivos CUDA (`.cu`/`.cuh`) | **{{ data.files_cuda }}** |
-| Líneas de kernels (LOC) | **{{ data.loc_kernels }}** |
-| Sistema de build | `{{ data.build_system }}` |
-| Dificultad (heurística §5.3) | `{{ data.difficulty }}` |
-| Librerías NVIDIA detectadas | {{ data.libs | length }}: {% if data.libs %}`{{ data.libs | join('`, `') }}`{% else %}_ninguna_{% endif %} |
+| CUDA files (`.cu`/`.cuh`) | **{{ data.files_cuda }}** |
+| Kernel lines (LOC) | **{{ data.loc_kernels }}** |
+| Build system | `{{ data.build_system }}` |
+| Difficulty (heuristic §5.3) | `{{ data.difficulty }}` |
+| NVIDIA libraries detected | {{ data.libs | length }}: {% if data.libs %}`{{ data.libs | join('`, `') }}`{% else %}_none_{% endif %} |
 
-### 2.1 Llamadas a API CUDA (conteo)
+### 2.1 CUDA API calls (count)
 
 {% if data.api_calls %}
 | API | Count |
 |---|---:|
 {% for name, n in data.api_calls.items() %}| `{{ name }}` | {{ n }} |
 {% endfor %}
-{% else %}_(Sin llamadas detectadas.)_
+{% else %}_(No calls detected.)_
 {% endif %}
 
 ---
 
-## 3. Fixes aplicados
+## 3. Applied fixes
 
 {% if data.fixes_by_class %}
-| Clase | n | Tier | Commits |
+| Class | n | Tier | Commits |
 |---|---:|---|---|
-{% for row in data.fixes_by_class %}| `{{ row.klass }}` | {{ row.n }} | `{{ row.tier }}` | {% if row.commits %}{% for sha in row.commits %}`{{ sha }}`{% if not loop.last %}, {% endif %}{% endfor %}{% else %}_(sin commits registrados)_{% endif %} |
+{% for row in data.fixes_by_class %}| `{{ row.klass }}` | {{ row.n }} | `{{ row.tier }}` | {% if row.commits %}{% for sha in row.commits %}`{{ sha }}`{% if not loop.last %}, {% endif %}{% endfor %}{% else %}_(no commits recorded)_{% endif %} |
 {% endfor %}
-{% else %}_(El loop no aplicó fixes — el repo ya compila o no se llegó a la fase BUILD_LOOP.)_
+{% else %}_(The loop applied no fixes — the repo already compiles, or the BUILD_LOOP phase was not reached.)_
 {% endif %}
 
 ---
 
-## 4. Hallazgos wave64 (linter determinista, §5.2)
+## 4. Wave64 findings (deterministic linter, §5.2)
 
 {% if data.wave64_findings %}
-| file:line | Pattern | Severity | Explicación |
+| file:line | Pattern | Severity | Explanation |
 |---|---|---|---|
 {% for f in data.wave64_findings %}| `{{ f.file }}:{{ f.line }}` | `{{ f.pattern_id }}` | `{{ f.severity }}` | {{ f.explanation }} |
 {% endfor %}
-{% else %}_(Sin hallazgos wave64 — el código no asume warp=32 en patrones conocidos.)_
+{% else %}_(No wave64 findings — the code does not assume warp=32 in known patterns.)_
 {% endif %}
 
 ---
 
-## 5. Verificación
+## 5. Verification
 
 - **Verdict:** `{{ data.verify_verdict }}`
 {% if data.verify_detail %}
-- **Detalle:** {{ data.verify_detail }}
+- **Detail:** {{ data.verify_detail }}
 {% endif %}
 {% if data.timing %}
-- **Tolerancias:** rtol/atol por defecto (F-09); no se compara floats en forma exacta.
+- **Tolerances:** default rtol/atol (F-09); floats are never compared exactly.
 {% endif %}
 
 ---
@@ -78,43 +78,42 @@
 ```json
 {{ data.timing | tojson(indent=2) }}
 ```
-{% else %}_(Sin timing reportado — el verify no se ejecutó o no proveyó métricas.)_
+{% else %}_(No timing reported — verify did not run or provided no metrics.)_
 {% endif %}
 
 ---
 
-## 7. Limitaciones y NEEDS_HUMAN
+## 7. Limitations and NEEDS_HUMAN
 
-> ⚠️ **Sección obligatoria** (degradación honesta, INV-5). Aunque esté vacía,
-> el certificado la incluye para que el lector sepa que el orquestador NO
-> oculta lo que no pudo resolver.
+> ⚠️ **Mandatory section** (honest degradation, INV-5). Even when empty, the
+> certificate includes it so the reader knows the orchestrator does NOT hide
+> what it could not resolve.
 
 {% if data.needs_human %}
-El loop no logró resolver las siguientes firmas (subjetivas a contexto del
-repo o fuera del catálogo de reglas deterministas). Requieren intervención
-humana o un modelo con más contexto que el LLM local:
+The loop could not resolve the following signatures (context-specific to the
+repo, or outside the deterministic rule catalog). They need human intervention
+or a model with more context than the local LLM:
 
 {% for sig in data.needs_human %}
 - `{{ sig }}`
 {% endfor %}
 {% else %}
-_No hay grupos sin resolver. El loop convergió (o no llegó a la fase de
-fixes)._
+_No unresolved groups. The loop converged (or did not reach the fix phase)._
 {% endif %}
 
 ---
 
-## 8. Métricas de eficiencia
+## 8. Efficiency metrics
 
-- **% fixes locales (deterministic + local)**: **{{ ((data.counters.fixes_deterministic + data.counters.fixes_local) * 100 // (data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote)) if (data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote) > 0 else 0 }}%** ({{ data.counters.fixes_deterministic }} deterministic + {{ data.counters.fixes_local }} local / {{ data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote }} total)
-- **Tokens local:** {{ data.counters.tokens_local }}
-- **Tokens remoto:** {{ data.counters.tokens_remote }}
-- **Iteraciones del loop:** {{ data.counters.iterations }}
-- **Errores iniciales → actuales:** {{ data.counters.errors_initial }} → {{ data.counters.errors_current }}
+- **% local fixes (deterministic + local)**: **{{ ((data.counters.fixes_deterministic + data.counters.fixes_local) * 100 // (data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote)) if (data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote) > 0 else 0 }}%** ({{ data.counters.fixes_deterministic }} deterministic + {{ data.counters.fixes_local }} local / {{ data.counters.fixes_deterministic + data.counters.fixes_local + data.counters.fixes_remote }} total)
+- **Local tokens:** {{ data.counters.tokens_local }}
+- **Remote tokens:** {{ data.counters.tokens_remote }}
+- **Loop iterations:** {{ data.counters.iterations }}
+- **Initial → current errors:** {{ data.counters.errors_initial }} → {{ data.counters.errors_current }}
 
-> Los números de esta sección se computan a partir de los contadores del
-> pipeline (F-17/INV-7): ningún campo es redactado por un LLM.
+> The numbers in this section are computed from the pipeline counters
+> (F-17/INV-7): no field is written by an LLM.
 
 ---
 
-_Generado por HIPnosis · F-17/INV-7: números siempre desde código._
+_Generated by HIPnosis · F-17/INV-7: numbers always from code._

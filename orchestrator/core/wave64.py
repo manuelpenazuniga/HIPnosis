@@ -22,13 +22,13 @@ from core.schemas import Wave64Finding
 # Explicaciones copiadas EXACTO del blueprint — F-17.
 # ---------------------------------------------------------------------------
 
-EXPL_W01 = "Máscara de 32 bits; en wave64 la máscara/resultado son de 64 bits"
-EXPL_W02 = "Resultado de ballot truncado a 32 bits en wave64"
-EXPL_W03 = "Debe ser __popcll sobre máscara de 64 bits"
-EXPL_W04 = "Ancho 32 hardcodeado; wavefront AMD = 64"
-EXPL_W05 = "Aritmética de lane asumiendo warp de 32 (&31, >>5)"
-EXPL_W06 = "Partición cooperative-groups de tamaño warp NVIDIA"
-EXPL_W07 = "warpSize debe consultarse en runtime en HIP, no fijarse en 32"
+EXPL_W01 = "32-bit mask — on wave64 the mask/result are 64-bit"
+EXPL_W02 = "Ballot result truncated to 32 bits on wave64"
+EXPL_W03 = "Should be __popcll over a 64-bit mask"
+EXPL_W04 = "Hardcoded width 32 — AMD wavefront is 64"
+EXPL_W05 = "Lane arithmetic assumes a 32-wide warp (&31, >>5)"
+EXPL_W06 = "Cooperative-groups partition of NVIDIA warp size"
+EXPL_W07 = "warpSize must be queried at runtime in HIP, not fixed at 32"
 
 
 _PATTERN_W01 = re.compile(r"__ballot(_sync)?\s*\(\s*0xffffffff")
