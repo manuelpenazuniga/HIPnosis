@@ -311,7 +311,17 @@ prueba silicio real y no lo podés volver a sacar sin re-encender el droplet ($$
       segmento "GPU real" del video de apéndice en footage de verdad.
 - [ ] Screenshots del estado final: dashboard con badge LIVE, el certificado, y el Passport
       (mostrando source/final commit reales + `gfx942`).
-- [ ] (Opcional) La terminal del run: `POST /runs` → los eventos drenando por API.
+- [ ] **Cast de terminal del run real** (un comando, complementa al screen-recording):
+
+  ```bash
+  # En el droplet. Graba la TERMINAL (POST /runs → eventos drenando → PASS) como
+  # asciinema cast. record_fixture.sh congela el TRACE; esto congela la salida REAL
+  # de la API — nada hardcodeado. (Justo donde un rival se quemó: falsificó un
+  # `>>> PASSED <<<` literal, con warpSize=32 en una MI300X que es wave64.)
+  pip install asciinema     # si no está en el droplet
+  scripts/record_demo_cast.sh https://github.com/manuelpenazuniga/bsw-cuda
+  # → assets/demo.cast (+ assets/demo.gif si tenés 'agg'). scp a tu Mac y commiteá.
+  ```
 
 **Guardalo todo en tu Mac** (scp / grabación local) **antes de destruir el droplet.**
 
