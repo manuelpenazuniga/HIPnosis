@@ -4,7 +4,9 @@
 > **Por qué:** el desarrollo del pipeline avanza 100% en modo `mock` sin GPU (ver `DEVIATIONS.md` D-2).
 > M0 valida que el hardware/toolchain real funciona, y produce el trace real que reemplaza al
 > `demo-run.jsonl` hand-authored. **Sin M0 verde no se corre el pipeline en modo `real`.**
-> **Tiempo estimado:** ~2 h (la mayor parte es esperar descargas de imágenes/pesos).
+> **Tiempo estimado (ruta eficiente):** droplet vivo **~45–60 min ≈ $1.5–2** — la mayor parte es
+> la descarga de pesos (usá Gemma **12B** y solapá con el smoke; ver §4). El costo corre mientras
+> el droplet EXISTE, no mientras lo usás → snapshot + destruir apenas quede verde.
 > Referencia: blueprint §12 (M0), §11 (F-01, F-01c, F-02), §1 (topología), §10 (env vars).
 
 ---
@@ -178,38 +180,57 @@ cp orchestrator/.env.example orchestrator/.env
 
 ## 4. Levantar el stack REAL con docker compose (perfil gpu)
 
+> ⏱️ **RUTA EFICIENTE (pagás vos — el droplet factura mientras existe).** Dos decisiones
+> que recortan el mayor sumidero de tiempo (la descarga de pesos):
+>
+> 1. **Usá Gemma 3 12B, no 27B.** Baja **~24 GB en vez de ~54 GB** (≈15–20 min menos), usa
+>    menos VRAM (menos riesgo de F-01), y mantiene la historia "Gemma local, $0 API" (sigue
+>    siendo Gemma → sigue contando para el premio Gemma). En `docker-compose.yml`, servicio
+>    `vllm`: `--model google/gemma-3-12b-it`; y `LOCAL_LLM_MODEL=google/gemma-3-12b-it` en `.env`.
+> 2. **Solapá la descarga con el smoke de hardware.** Arrancá el stack en background (`up -d`)
+>    y mientras baja los pesos corré el paso 2 (rocminfo, hipcc saxpy, hipify-perl) — el reloj
+>    de la GPU corre igual, así que no lo desperdicies mirando una barra de progreso.
+>
+> **Solo corré bsw** (paso 5), no los 3 repos: un run verde grabado alcanza. Y apenas esté
+> verde: capturas + `record_fixture.sh` + **snapshot + DESTRUIR** (secciones 6 y 6.5).
+> Objetivo realista: **droplet vivo ~45–60 min ≈ $1.5–2**.
+
 ```bash
 # HF_TOKEN ya NO se exporta a mano: el servicio vllm lee orchestrator/.env
 # directamente (env_file, arreglado post-audit P0.11). Solo asegurate de que
 # el paso 3 dejó HF_TOKEN= completo en orchestrator/.env.
 
-docker compose --profile gpu up -d --build
+docker compose --profile gpu up -d --build   # -d = background: dejalo bajando y seguí con el paso 2
 # Esto levanta 2 servicios:
-#   - vllm  : imagen oficial rocm/vllm sirviendo Gemma 3 27B IT en :8000 (⚠️ F-01: NO compilar vLLM)
+#   - vllm  : imagen oficial rocm/vllm sirviendo Gemma 3 12B IT en :8000 (⚠️ F-01: NO compilar vLLM)
 #   - orchestrator : FastAPI + pipeline en :8080
 ```
 
 ### 4.1 — Verificar que vLLM sirve Gemma (⚠️ F-01, el escalón más frágil)
 
 ```bash
-# Esperá 3-10 min a que baje los pesos (la 1ª vez). Seguí el progreso:
+# La descarga de pesos es lo más lento. Mientras baja, andá haciendo el paso 2
+# (smoke de hardware) en otra terminal SSH — solapás y no perdés tiempo de GPU.
 docker compose --profile gpu logs -f vllm    # Ctrl-C cuando veas "Application startup complete"
 
-# Probá un chat:
+# Probá un chat (ajustá el model si usaste 27B):
 curl -s http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"google/gemma-3-27b-it","messages":[{"role":"user","content":"di OK"}],"max_tokens":5}'
+  -d '{"model":"google/gemma-3-12b-it","messages":[{"role":"user","content":"di OK"}],"max_tokens":5}'
 # Esperado: un JSON con una respuesta. Si funciona → F-01 superado.
 ```
 
-⚠️ **Si vLLM crashea/cuelga (F-01), cadena de fallbacks EN ORDEN, máx 45 min por escalón** (blueprint §11 F-01):
+⚠️ **Cronómetro DURO (pagás vos): si vLLM no sirve en ~20–25 min, cortá y andá al fallback Fireworks.**
+No pelees con vLLM una hora — eso es plata. Cadena de fallbacks EN ORDEN (blueprint §11 F-01):
 1. Reintentar con `--max-model-len 32768` (ya está en el compose).
-2. Bajar a **Gemma 3 12B**: en `docker-compose.yml`, servicio `vllm`, cambiá `--model google/gemma-3-12b-it`
-   y `LOCAL_LLM_MODEL=google/gemma-3-12b-it` en `.env`.
-3. llama.cpp-ROCm con un GGUF de Gemma.
-4. **Gemma vía Fireworks**: en `.env`, apuntá `LOCAL_LLM_BASE_URL` al endpoint de Fireworks y usá
-   `FIREWORKS_API_KEY`. Se pierde el "0 tokens locales" pero el producto sobrevive.
-   *La decisión de fallback se toma con cronómetro, no con orgullo.*
+2. Si empezaste con 27B, bajá a **12B** (`--model google/gemma-3-12b-it` + `LOCAL_LLM_MODEL`).
+3. **Fireworks para TODO el tier LLM** (el corte de tiempo): en `orchestrator/.env` poné
+   `LOCAL_LLM_BASE_URL=https://api.fireworks.ai/inference/v1` y
+   `LOCAL_LLM_MODEL=accounts/fireworks/models/deepseek-v4-pro`, y levantá **solo el orquestador**
+   sin vLLM: `docker compose --profile gpu up -d --build --no-deps orchestrator`. Se pierde el
+   "$0 local" del run grabado (la fix de wave64 va a la nube, centavos), pero seguís teniendo lo
+   que importa: compile REAL en MI300X + paridad numérica + wave64. *El fallback se decide con
+   cronómetro, no con orgullo.*
 
 ### 4.2 — Verificar el orquestador
 
@@ -220,37 +241,83 @@ curl -s http://localhost:8080/healthz          # {"ok":true}
 
 ---
 
-## 5. Correr el pipeline REAL contra el primer repo demo (bsw-cuda)
+## 5. Correr el pipeline REAL contra bsw-cuda (solo ese)
+
+**Antes de disparar el run:** abrí un túnel SSH para ver (y GRABAR) el dashboard desde tu Mac.
+Es el momento estrella — el badge va a decir **LIVE · MI300X**, no "synthetic demo".
 
 ```bash
-# Disparar un run real contra un repo demo STANDALONE (clonable directo, con su
-# hipnosis.yaml y su test-data; NO el HeCBench completo — F-03/P0.10).
+# En tu Mac, en otra terminal — túnel al dashboard del droplet:
+ssh -L 8080:localhost:8080 root@<ip-droplet>
+# Ahora abrí http://localhost:8080/ en tu browser. Empezá a grabar pantalla (ver 6.5).
+```
+
+```bash
+# En el droplet: disparar el run real contra el repo demo STANDALONE (clonable directo,
+# con su hipnosis.yaml y su test-data; NO el HeCBench completo — F-03/P0.10).
 curl -s -X POST http://localhost:8080/runs \
   -H "Content-Type: application/json" \
   -d '{"repo_url":"https://github.com/manuelpenazuniga/bsw-cuda"}'
-# Los otros dos: .../softmax-cuda (fácil) y .../scan-cuda (medio).
-# El endpoint solo acepta los repos de REPO_ALLOWLIST (P0.12) — ya seteada en compose.
-
-# Seguí el run EN VIVO en el dashboard, o por API:
-#   curl "http://localhost:8080/runs/<run_id>/events?after=-1"
+# Guardá el run_id que devuelve. El endpoint solo acepta repos de REPO_ALLOWLIST (ya en compose).
+# (softmax-cuda y scan-cuda existen, pero para M0 eficiente con bsw ALCANZA — no los corras.)
 ```
 
-✅ **M0 verde = el run llega a `DONE` con `verify: PASS`** (bsw-cuda compila en ROCm y su self-check
-interno pasa). Los contadores (fixes local/remoto/deterministic) quedan poblados.
+Seguí el run en el dashboard (o por API: `curl "http://localhost:8080/runs/<run_id>/events?after=-1"`).
+
+✅ **M0 verde = el run llega a `DONE` con `verify: PASS`** (bsw-cuda compila en ROCm y su golden
+de Smith-Waterman pasa). Los contadores (fixes local/remoto/deterministic) quedan poblados.
 
 ---
 
-## 6. Grabar el trace real (reemplaza al demo-run hand-authored)
+## 6. Grabar el trace real + capturas (reemplaza al demo-run hand-authored)
 
 ```bash
-# Un solo comando graba trace + certificado + diff del run real a fixtures/
-# (reemplaza el demo sintético; el badge del dashboard pasa solo a 'recorded run'):
+# En el droplet: un solo comando graba trace + certificado + diff + attestation del run
+# real a fixtures/ (reemplaza el demo sintético; el badge pasa solo a 'recorded run'):
 scripts/record_fixture.sh <run_id>
-# Luego seguí las instrucciones que imprime (git add/commit/push de los 3 fixtures).
 ```
 
-📸 **Sacá un snapshot/imagen del droplet ahora** (tras M0 verde) — es tu seguro contra F-14
-(si el droplet muere a mitad de semana, restaurás desde acá).
+Después, **traé los fixtures a tu Mac y commiteá desde ahí** (no comitees en el droplet efímero):
+
+```bash
+# En tu Mac:
+scp -r root@<ip-droplet>:HIPnosis/fixtures/demo-run.jsonl \
+       root@<ip-droplet>:HIPnosis/fixtures/demo-certificate.md \
+       root@<ip-droplet>:HIPnosis/fixtures/demo-diff.txt \
+       root@<ip-droplet>:HIPnosis/fixtures/demo-attestation.jsonl  ./fixtures/
+git add fixtures/ && git commit -m "chore(fixtures): trace REAL de M0 (bsw-cuda verde en MI300X)" && git push
+```
+
+📸 **Snapshot del droplet ANTES de destruir** (seguro F-14 + te deja re-correr sin re-descargar):
+consola del cloud → tu droplet → **Take snapshot**. Cuando termine, **Destroy** el droplet.
+
+---
+
+## 6.5 Qué grabar / capturar durante M0 (hacelo con el droplet VIVO)
+
+El artefacto obligatorio lo produce `record_fixture.sh` (arriba). Pero mientras la GPU está
+viva —y solo mientras lo está— capturá esto para el **video y la submission**. Es material que
+prueba silicio real y no lo podés volver a sacar sin re-encender el droplet ($$):
+
+**Obligatorio (prueba de MI300X real):**
+- [ ] Salida de `rocminfo | grep -i gfx942` (copiá el texto o screenshot) — prueba de la GPU.
+- [ ] Salida del `hipcc saxpy` del paso 2 (`y[0]=5.0`) — prueba del toolchain.
+- [ ] Los 4 fixtures que graba `record_fixture.sh` (ya cubiertos en la sección 6).
+
+**Para el video (la escena "GPU real" del guion, `docs/video-script.md`):**
+- [ ] **Screen-recording del dashboard EN VIVO durante el run** (vía el túnel SSH del paso 5):
+      el badge **LIVE · MI300X**, el burndown drenando, el panel wave64, el veredicto **PASS**,
+      y el **Port Passport con digests reales** (commits reales, gfx942). Esto convierte el
+      segmento "GPU real" del video de apéndice en footage de verdad.
+- [ ] Screenshots del estado final: dashboard con badge LIVE, el certificado, y el Passport
+      (mostrando source/final commit reales + `gfx942`).
+- [ ] (Opcional) La terminal del run: `POST /runs` → los eventos drenando por API.
+
+**Guardalo todo en tu Mac** (scp / grabación local) **antes de destruir el droplet.**
+
+> 🎬 Tip: grabá la pantalla del dashboard en 1080p desde que disparás el `POST /runs`. Un solo
+> take de ~1–2 min del run real vale más que cualquier tarjeta de marketing — es la evidencia
+> de que HIPnosis corre en la MI300X, no un terminal scripteado.
 
 ---
 
@@ -265,14 +332,19 @@ Si algún paso falló y no se pudo resolver en su ventana de tiempo, anotá cuá
 
 ---
 
-## Resumen ultra-corto (si ya sabés lo que hacés)
+## Resumen ultra-corto — ruta eficiente (droplet vivo mínimo)
 ```bash
-rocminfo | grep gfx942                                   # 1. GPU
-hipcc --offload-arch=gfx942 saxpy.cpp -o s && ./s        # 2. toolchain
-which hipify-perl                                        # 3. hipify (perl!)
-cp orchestrator/.env.example orchestrator/.env && vim orchestrator/.env   # 4. HF_TOKEN
-export HF_TOKEN=... && docker compose --profile gpu up -d --build          # 5. stack
-curl localhost:8000/v1/chat/completions -d '{...}'       # 6. Gemma vivo (F-01)
-curl -X POST localhost:8080/runs -d '{"repo_url":"..."}' # 7. run real → PASS
-cp workspaces/<id>/trace.jsonl fixtures/demo-run.jsonl   # 8. grabar trace real
+# 0. TODO listo antes de crear el droplet (§0): SSH key, HF_TOKEN, Fireworks, licencia Gemma.
+# 1. crear droplet 1x MI300X (imagen ROCm) → ssh root@<ip> → git clone .../HIPnosis && cd HIPnosis
+cp orchestrator/.env.example orchestrator/.env && vim orchestrator/.env   # HF_TOKEN + Fireworks
+# usar Gemma 12B (mitad de descarga): editar docker-compose.yml vllm --model google/gemma-3-12b-it
+docker compose --profile gpu up -d --build               # 2. arrancar EN BACKGROUND (deja bajando)
+# 3. MIENTRAS baja, en paralelo: smoke de hardware
+rocminfo | grep gfx942 && hipcc --offload-arch=gfx942 saxpy.cpp -o s && ./s && which hipify-perl
+curl localhost:8000/v1/chat/completions -d '{...}'       # 4. Gemma vivo (F-01; cronómetro 20min→Fireworks)
+# 5. en tu Mac: ssh -L 8080:localhost:8080 root@<ip>  → abrir dashboard + EMPEZAR A GRABAR
+curl -X POST localhost:8080/runs -d '{"repo_url":"https://github.com/manuelpenazuniga/bsw-cuda"}'  # 6. run → PASS
+scripts/record_fixture.sh <run_id>                       # 7. grabar artefactos reales
+# 8. capturas (rocminfo, dashboard LIVE, cert, passport) → scp a tu Mac (§6.5)
+# 9. SNAPSHOT + DESTROY el droplet (cortás el costo)
 ```
