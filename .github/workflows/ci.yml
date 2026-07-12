@@ -1,0 +1,71 @@
+# CI — protege el entregable. Corre en cada push/PR:
+#   1. tests: la suite completa (393) del orquestador.
+#   2. replay-smoke: build del contenedor replay (el artefacto ejecutable) +
+#      healthz + smoke del dashboard — el gate que el audit pidió y que habría
+#      cazado la página en blanco / los deep-links rotos.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        working-directory: orchestrator
+        run: pip install -e ".[dev]"
+      - name: Run test suite
+        working-directory: orchestrator
+        run: python -m pytest -q
+
+  replay-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build replay image
+        run: docker compose build orchestrator-replay
+      - name: Start replay stack
+        run: docker compose --profile replay up -d
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8080/healthz && break
+            echo "waiting for orchestrator… ($i)"; sleep 2
+          done
+      - name: Gate — healthz reports replay mode
+        run: curl -fsS http://localhost:8080/healthz | grep -q '"mode":"replay"'
+      - name: Gate — dashboard serves and assets load
+        run: |
+          curl -fsS http://localhost:8080/ | grep -q 'id="app"'
+          curl -fsS -o /dev/null http://localhost:8080/app.js
+          curl -fsS -o /dev/null http://localhost:8080/vendor/tailwind.css
+      - name: Gate — recorded run is fully wired (deterministic artifacts)
+        run: |
+          # Estos endpoints NO dependen del reloj de replay: prueban que la
+          # corrida grabada está bien cableada (diff, certificado y passport).
+          curl -fsS -o /dev/null http://localhost:8080/runs/run_bsw01a2
+          curl -fsS -o /dev/null http://localhost:8080/runs/run_bsw01a2/diff
+          curl -fsS -o /dev/null http://localhost:8080/runs/run_bsw01a2/certificate
+          # El passport debe traer el digest del diff (base del VERIFIED del dashboard).
+          curl -fsS "http://localhost:8080/runs/run_bsw01a2/attestation" \
+            | python3 -c "import json,sys; a=json.load(sys.stdin)['attestation']; d=a['predicate']['materials']['diff']['digest']; assert len(d)==64, 'digest invalido'; print('passport digest ok', d[:12])"
+      - name: Gate — replay clock reveals events
+        run: |
+          # El reloj revela eventos con el tiempo; tras unos segundos debe haber
+          # al menos uno visible (lenient: no fijamos el total exacto).
+          sleep 15
+          curl -fsS "http://localhost:8080/runs/run_bsw01a2/events?after=-1" \
+            | python3 -c "import json,sys; e=json.load(sys.stdin); assert isinstance(e,list) and len(e)>=1, 'sin eventos visibles'; print(f'{len(e)} eventos visibles')"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose --profile replay logs
+      - name: Teardown
+        if: always()
+        run: docker compose --profile replay down -v

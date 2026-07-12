@@ -6,6 +6,8 @@
 
 **Paste a CUDA repo URL. Get back a verified, compiled, numerically-checked ROCm port — with a certificate to prove it.**
 
+[![CI](https://github.com/manuelpenazuniga/HIPnosis/actions/workflows/ci.yml/badge.svg)](https://github.com/manuelpenazuniga/HIPnosis/actions/workflows/ci.yml)
+[![HIPnosis Guard](https://github.com/manuelpenazuniga/HIPnosis/actions/workflows/hipnosis-guard.yml/badge.svg)](https://github.com/manuelpenazuniga/HIPnosis/actions/workflows/hipnosis-guard.yml)
 [![Tests](https://img.shields.io/badge/tests-393%20passing-brightgreen)](orchestrator/tests)
 [![ROCm](https://img.shields.io/badge/ROCm-6.x%20%7C%20MI300X-ED1C24)](https://www.amd.com/en/products/software/rocm.html)
 [![Gemma 3](https://img.shields.io/badge/LLM-Gemma%203%2027B%20local-4285F4)](https://huggingface.co/google/gemma-3-27b-it)

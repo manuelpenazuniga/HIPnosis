@@ -21,3 +21,7 @@ workspaces/
 ../HIPnosis-t*
 # Workspaces del pipeline dentro de orchestrator
 orchestrator/workspaces/
+
+# editable install metadata
+*.egg-info/
+__pycache__/
